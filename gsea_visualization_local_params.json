@@ -1,0 +1,364 @@
+{
+  "run_label": "gsea_visualization",
+  "created_at": "2026-06-08",
+  "inputs": {
+    "GSEA_Filter_Result": "gsea_filter_result",
+    "GSEA_Preranked_Result": "gsea_preranked_result",
+    "GSdb": "gsdb_result",
+    "Batch_Result": "batch_result"
+  },
+  "template_parameters": {
+    "GSEA_Filter_Result": "gsea_filter_result",
+    "GSEA_Preranked_Result": "gsea_preranked_result",
+    "GSdb_Result": "gsdb_result",
+    "Batch_Result": "batch_result",
+    "Plot_Contrasts": "c()",
+    "Plot_All_Pathways": false,
+    "Top_N_Pathways": 1,
+    "Plots_to_Include": "ES+RNK+LE",
+    "Running_Score_Line_Color": "ES sign",
+    "Add_Max_Deviation_Line": "coordinate",
+    "Display_Leading_Edge_Genes": false,
+    "Number_of_Leading_Edge_Genes_to_Display": 10,
+    "Font_Size_of_Leading_Edge_Genes": 3,
+    "Heatmap_Gene_Names_Column": "gene",
+    "Heatmap_Sample_Names_Column": "Sample",
+    "Heatmap_Group_Column": "Group",
+    "Heatmap_Transform": "z-score",
+    "Max_LE_Genes_Heatmap": 50,
+    "Cluster_LE_Heatmap_Rows": true,
+    "Cluster_LE_Heatmap_Columns": false,
+    "Show_LE_Heatmap_Sample_Names": false,
+    "Show_LE_Heatmap_Gene_Names": true,
+    "Show_LE_Heatmap_Rank_Labels": true,
+    "Order_LE_Heatmap_Rows_by_Rank": true,
+    "Max_Plots_in_PDF": 50,
+    "Stop_if_Too_Many_Plots": true,
+    "PDF_Width": 8.5,
+    "PDF_Height": 6.5,
+    "Preview_Contrast": "",
+    "Preview_Contrasts": "c()",
+    "Image_Width": 8,
+    "Image_Height": 5.5,
+    "Image_DPI": 160
+  },
+  "function_args": {
+    "function_name": "GSEA_Visualization_Local",
+    "gsea_filter_result": "gsea_filter_result",
+    "gsea_preranked_result": "gsea_preranked_result",
+    "gsdb_result": "gsdb_result",
+    "batch_result": "batch_result",
+    "plot_contrasts": [],
+    "plot_all_pathways": false,
+    "top_n_pathways": 1,
+    "plots_to_include": "ES+RNK+LE",
+    "running_score_line_color": "ES sign",
+    "add_max_deviation_line": "coordinate",
+    "display_leading_edge_genes": false,
+    "number_of_leading_edge_genes_to_display": 10,
+    "font_size_of_leading_edge_genes": 3,
+    "heatmap_gene_names_column": "gene",
+    "heatmap_sample_names_column": "Sample",
+    "heatmap_group_column": "Group",
+    "heatmap_transform": "z-score",
+    "max_le_genes_heatmap": 50,
+    "cluster_le_heatmap_rows": true,
+    "cluster_le_heatmap_columns": false,
+    "show_le_heatmap_sample_names": false,
+    "show_le_heatmap_gene_names": true,
+    "show_le_heatmap_rank_labels": true,
+    "order_le_heatmap_rows_by_rank": true,
+    "max_plots_in_pdf": 50,
+    "stop_if_too_many_plots": true,
+    "pdf_width": 8.5,
+    "pdf_height": 6.5,
+    "preview_contrast": "",
+    "preview_contrasts": [],
+    "image_width": 8,
+    "image_height": 5.5,
+    "image_dpi": 160
+  },
+  "parameter_metadata": {
+    "function_name": {
+      "label": "Function name",
+      "group": "System",
+      "impact": "system",
+      "review_required": false,
+      "visible": false
+    },
+    "gsea_filter_result": {
+      "label": "GSEA-F result",
+      "group": "Input",
+      "impact": "input",
+      "review_required": false,
+      "visible": false
+    },
+    "gsea_preranked_result": {
+      "label": "GSEA-P result",
+      "group": "Input",
+      "impact": "input",
+      "review_required": false,
+      "visible": false
+    },
+    "gsdb_result": {
+      "label": "GSdb result",
+      "group": "Input",
+      "impact": "input",
+      "review_required": false,
+      "visible": false
+    },
+    "batch_result": {
+      "label": "Final expression result",
+      "group": "Input",
+      "impact": "input",
+      "review_required": false,
+      "visible": false
+    },
+    "plot_contrasts": {
+      "label": "Contrasts to plot",
+      "description": "Leave empty to plot all contrasts retained by GSEA-F.",
+      "group": "Main",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": true,
+      "multiple": true
+    },
+    "plot_all_pathways": {
+      "label": "Plot all filtered pathways",
+      "description": "If disabled, the saved PDF includes only the top ranked pathways for each contrast and collection.",
+      "group": "Main",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": true
+    },
+    "top_n_pathways": {
+      "label": "Top ranked pathways per contrast/collection",
+      "description": "Used when Plot all filtered pathways is disabled. This number is applied separately to each contrast and collection in the saved PDF.",
+      "group": "Main",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": true
+    },
+    "preview_contrast": {
+      "label": "Deprecated: preview contrast",
+      "description": "Kept for compatibility with older saved parameters. Use Preview contrasts instead.",
+      "group": "System",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": false
+    },
+    "max_plots_in_pdf": {
+      "label": "Max plots in PDF",
+      "description": "Guardrail to avoid generating very large PDFs by accident.",
+      "group": "PDF Output",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": true
+    },
+    "stop_if_too_many_plots": {
+      "label": "Stop if plot count exceeds cap",
+      "group": "PDF Output",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": true
+    },
+    "plots_to_include": {
+      "label": "Plots to include",
+      "description": "ES+RNK+LE shows the running enrichment score, ranked gene-score panel, and ComplexHeatmap leading-edge heatmap.",
+      "group": "Main",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": true
+    },
+    "running_score_line_color": {
+      "label": "Running score line color",
+      "group": "ES Plot",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": true
+    },
+    "add_max_deviation_line": {
+      "label": "Max deviation guide line",
+      "group": "ES Plot",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": true
+    },
+    "display_leading_edge_genes": {
+      "label": "Deprecated: show Panel B gene names",
+      "description": "Kept for compatibility with older saved parameters. Panel B no longer displays individual gene labels.",
+      "group": "System",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": false
+    },
+    "number_of_leading_edge_genes_to_display": {
+      "label": "Deprecated: Panel B genes to name",
+      "group": "System",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": false
+    },
+    "font_size_of_leading_edge_genes": {
+      "label": "Deprecated: Panel B gene font size",
+      "group": "System",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": false
+    },
+    "heatmap_gene_names_column": {
+      "label": "LE heatmap gene column",
+      "group": "LE Heatmap",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": true
+    },
+    "heatmap_sample_names_column": {
+      "label": "LE heatmap sample column",
+      "group": "LE Heatmap",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": true
+    },
+    "heatmap_group_column": {
+      "label": "LE heatmap group column",
+      "group": "LE Heatmap",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": true
+    },
+    "heatmap_transform": {
+      "label": "LE heatmap transform",
+      "description": "Transform expression values before drawing the ComplexHeatmap leading-edge heatmap.",
+      "group": "LE Heatmap",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": true
+    },
+    "max_le_genes_heatmap": {
+      "label": "Max LE genes in heatmap",
+      "description": "Caps each leading-edge heatmap to keep preview and PDF pages readable.",
+      "group": "LE Heatmap",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": true
+    },
+    "cluster_le_heatmap_rows": {
+      "label": "Cluster LE heatmap rows",
+      "group": "LE Heatmap",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": true
+    },
+    "cluster_le_heatmap_columns": {
+      "label": "Cluster LE heatmap columns",
+      "group": "LE Heatmap",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": true
+    },
+    "show_le_heatmap_sample_names": {
+      "label": "Show LE heatmap sample names",
+      "group": "LE Heatmap",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": true
+    },
+    "show_le_heatmap_gene_names": {
+      "label": "Show LE heatmap gene names",
+      "group": "LE Heatmap",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": true
+    },
+    "show_le_heatmap_rank_labels": {
+      "label": "Prefix LE heatmap genes with LE# rank",
+      "description": "Adds within-leading-edge ranks to heatmap row labels, e.g. LE#1 Myc. Rank 1 is the strongest up or down leading-edge gene for that pathway.",
+      "group": "LE Heatmap",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": true
+    },
+    "order_le_heatmap_rows_by_rank": {
+      "label": "Order LE heatmap rows by LE# rank",
+      "description": "Shows strongest leading-edge genes first. When enabled, row clustering is disabled for the LE heatmap so the rank order is preserved.",
+      "group": "LE Heatmap",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": true
+    },
+    "pdf_width": {
+      "label": "PDF page width",
+      "group": "PDF Output",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": true
+    },
+    "pdf_height": {
+      "label": "PDF page height",
+      "group": "PDF Output",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": true
+    },
+    "preview_contrasts": {
+      "label": "Preview contrasts",
+      "description": "Creates one output preview tab for the top ranked pathway from each selected contrast. All available contrasts are selected by default; remove contrasts to reduce preview tabs. The saved PDF still follows the Main and PDF Output settings.",
+      "group": "Preview",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": true,
+      "multiple": true
+    },
+    "image_width": {
+      "label": "Preview image width",
+      "group": "Preview",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": true
+    },
+    "image_height": {
+      "label": "Preview image height",
+      "group": "Preview",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": true
+    },
+    "image_dpi": {
+      "label": "Preview image DPI",
+      "group": "Preview",
+      "impact": "display",
+      "role": "format",
+      "review_required": false,
+      "visible": true
+    }
+  }
+}

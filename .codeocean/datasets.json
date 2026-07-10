@@ -1,0 +1,21 @@
+{
+	"version": 1,
+	"attached_datasets": [
+		{
+			"id": "28035d52-03e6-4761-8f50-72d48af496d1",
+			"mount": "deg_table"
+		},
+		{
+			"id": "6b72a755-1e91-42d1-9136-48a37f427bde",
+			"mount": "sample_metadata"
+		},
+		{
+			"id": "810912ce-dc3e-4f15-b4a1-b269e7404c37",
+			"mount": "normalized_expression"
+		},
+		{
+			"id": "823c9efa-1f4f-4b11-8d4d-a88feade094e",
+			"mount": "gsea_filter_results"
+		}
+	]
+}
