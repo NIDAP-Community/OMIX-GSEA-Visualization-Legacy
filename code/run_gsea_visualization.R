@@ -10,44 +10,6 @@ suppressPackageStartupMessages({
 # Source the core visualization function
 source("/code/GSEA_Visualization_Local_v1.R")
 
-#' Drop empty-string tokens that appear in positional (non-value) slots.
-#' Code Ocean may inject "" for a newly-added App Panel list parameter that
-#' has no stored value in the user's saved run configuration, OR may send
-#' --flag with no value at all (next token is the next --flag).
-#'
-#' Rules applied to every token in commandArgs(trailingOnly=TRUE):
-#'   - --flag <value>  : kept as-is (value may be "").
-#'   - --flag <--flag2>: current flag DROPPED; optparse will use its default.
-#'   - --flag (last)   : kept; optparse will error/default as appropriate.
-#'   - "" (positional) : dropped.
-#'   - "x" (positional): kept.
-sanitize_argv <- function(raw) {
-  out <- character(0)
-  i   <- 1L
-  while (i <= length(raw)) {
-    a <- raw[[i]]
-    if (grepl("^-", a)) {
-      has_value <- i < length(raw) && !grepl("^-", raw[[i + 1L]])
-      if (has_value) {
-        # --flag value (value may be ""): preserve the pair
-        out <- c(out, a)
-        i   <- i + 1L
-        out <- c(out, raw[[i]])
-      } else if (i == length(raw)) {
-        # Last token, no value: keep and let optparse decide
-        out <- c(out, a)
-      }
-      # else: next token is another --flag → this flag has no value → DROP it
-      # so optparse uses its registered default instead of stealing the next flag.
-    } else if (nzchar(a)) {
-      out <- c(out, a)   # non-empty positional arg — keep
-    }
-    # else: empty-string in positional slot — silently drop
-    i <- i + 1L
-  }
-  out
-}
-
 #' Parse command-line arguments
 get_args <- function() {
   option_list <- list(
@@ -113,7 +75,7 @@ get_args <- function() {
     option_list = option_list
   )
   
-  optparse::parse_args(parser, args = sanitize_argv(commandArgs(trailingOnly = TRUE)))
+  optparse::parse_args(parser)
 }
 
 #' Load RDS file with error handling
