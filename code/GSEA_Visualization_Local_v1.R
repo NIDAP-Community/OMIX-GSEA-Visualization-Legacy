@@ -1085,22 +1085,35 @@ gsea_vis_rank_plot <- function(
   if (!is.na(nes) && nes < 0) {
     le_text_y <- score_range[[2]] - 0.12 * score_span
   }
-  area_layers <- if (identical(as.character(rank_area_color %||% "grey"), "red_blue")) {
-    margins_rnk <- gsea_vis_color_margins()
-    list(
-      ggplot2::geom_area(
-        ggplot2::aes(y = pmax(display_score, 0)),
-        fill = margins_rnk["up"], color = NA, alpha = 0.75, na.rm = TRUE
-      ),
-      ggplot2::geom_area(
-        ggplot2::aes(y = pmin(display_score, 0)),
-        fill = margins_rnk["dn"], color = NA, alpha = 0.75, na.rm = TRUE
+  area_layers <- {
+    # "red_blue": per-gene gradient fill (red→white→blue by score value),
+    #   identical palette to the ES strip rug — fully independent of line_color.
+    # "grey"    : smooth grey area (default).
+    if (identical(as.character(rank_area_color %||% "grey"), "red_blue")) {
+      margins_rnk  <- gsea_vis_color_margins()
+      clip_rnk     <- stats::quantile(abs(ranks$score), 0.95, na.rm = TRUE)
+      if (!is.finite(clip_rnk) || clip_rnk == 0) clip_rnk <- max(abs(ranks$score), na.rm = TRUE)
+      if (!is.finite(clip_rnk) || clip_rnk == 0) clip_rnk <- 1
+      ranks$fill_score <- pmax(pmin(ranks$score, clip_rnk), -clip_rnk)
+      list(
+        ggplot2::geom_col(
+          ggplot2::aes(y = display_score, fill = fill_score),
+          width = if (nrow(ranks) >= 1000) 10 else 1,
+          color = NA, show.legend = FALSE, na.rm = TRUE
+        ),
+        ggplot2::scale_fill_gradient2(
+          high     = unname(margins_rnk["up"]),
+          low      = unname(margins_rnk["dn"]),
+          mid      = unname(margins_rnk["md"]),
+          midpoint = 0,
+          limits   = c(-1, 1) * clip_rnk
+        )
       )
-    )
-  } else {
-    list(
-      ggplot2::geom_area(fill = "#AAAAAA", color = NA, alpha = 0.85, na.rm = TRUE)
-    )
+    } else {
+      list(
+        ggplot2::geom_area(fill = "#AAAAAA", color = NA, alpha = 0.85, na.rm = TRUE)
+      )
+    }
   }
   plot <- ggplot2::ggplot(ranks, ggplot2::aes(x = index, y = display_score)) +
     area_layers +
