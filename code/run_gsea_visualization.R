@@ -7,8 +7,27 @@ suppressPackageStartupMessages({
   library(optparse)
 })
 
-# Source the core visualization function
-source("/code/GSEA_Visualization_Local_v1.R")
+# Source the core visualization function from the same directory as this script.
+# Fall back to /code for container deployments that mount the files there.
+script_args <- commandArgs(trailingOnly = FALSE)
+script_file_arg <- grep("^--file=", script_args, value = TRUE)
+script_dir <- if (length(script_file_arg) > 0) {
+  dirname(normalizePath(sub("^--file=", "", script_file_arg[[1]]), mustWork = FALSE))
+} else {
+  getwd()
+}
+core_candidates <- c(
+  file.path(script_dir, "GSEA_Visualization_Local_v1.R"),
+  "/code/GSEA_Visualization_Local_v1.R"
+)
+core_file <- core_candidates[file.exists(core_candidates)][1]
+if (is.na(core_file)) {
+  stop(
+    "ERROR: GSEA_Visualization_Local_v1.R was not found beside the CLI script or under /code.",
+    call. = FALSE
+  )
+}
+source(core_file)
 
 #' Parse command-line arguments
 get_args <- function() {
@@ -453,8 +472,6 @@ main <- function() {
     character(0)  # "none" or unrecognised → all contrasts
   )
 
-  preview_contrasts <- character(0)  # PNG previews disabled
-
   cat(sprintf("\nConfiguration:\n"))
   cat(sprintf("  Contrast filter: %s\n", contrast_filter_mode))
   if (contrast_filter_mode != "none" && length(contrast_names) > 0) {
@@ -482,10 +499,10 @@ main <- function() {
     ))
     cat("      several minutes. Set 'Max plots in PDF' to a number to cap the output.\n\n")
   }
-  if (!max_plots_unlimited && n_rows_selected > max_plots_val) {
+  if (!max_plots_unlimited && n_rows_selected > max_plots_in_pdf) {
     cat(sprintf(
       "NOTE: Max plots in PDF is set to %d — output will be truncated from ~%d plots.\n\n",
-      max_plots_val, n_rows_selected
+      max_plots_in_pdf, n_rows_selected
     ))
   }
 
@@ -500,8 +517,6 @@ main <- function() {
     plot_all_pathways     = plot_all_paths,
     top_n_pathways        = top_n_pathways,
     top_n_by_sign         = top_n_by_sign,
-    preview_contrast      = "",
-    preview_contrasts     = preview_contrasts,
     max_plots_in_pdf      = max_plots_in_pdf,
     stop_if_too_many_plots = FALSE,        # never stop; always truncate to cap
     plots_to_include      = plots_to_include,
@@ -546,26 +561,13 @@ main <- function() {
   cat(sprintf("\n%s\n\n", result$message))
   
   if (is.data.frame(result$manifest) && nrow(result$manifest) > 0) {
-    # Copy key outputs to stable filenames so App Panel tabs resolve correctly
-    stable <- list(
-      pdf        = file.path(args$output_dir, "GSEA-Vis-Enrichment-Plots.pdf"),
-      running_es = file.path(args$output_dir, "GSEA-Vis-RunningES.csv"),
-      running_es_rds = file.path(args$output_dir, "GSEA-Vis-RunningES.rds")
-    )
-    #if (!is.null(result$files$pdf) && file.exists(result$files$pdf)) {
-    #  file.copy(result$files$pdf, stable$pdf, overwrite = TRUE)
-    #}
-    #if (!is.null(result$files$running_es) && file.exists(result$files$running_es)) {
-    #  file.copy(result$files$running_es, stable$running_es, overwrite = TRUE)
-    #}
-    #if (is.data.frame(result$running_es)) {
-    #  saveRDS(result$running_es, stable$running_es_rds)
-    #}
-
     cat("Generated files:\n")
-    if (file.exists(stable$pdf))           cat(sprintf("  PDF:              %s\n", stable$pdf))
-    if (file.exists(stable$running_es))    cat(sprintf("  Running ES (CSV): %s\n", stable$running_es))
-    if (file.exists(stable$running_es_rds)) cat(sprintf("  Running ES (RDS): %s\n", stable$running_es_rds))
+    if (!is.null(result$files$pdf) && file.exists(result$files$pdf)) {
+      cat(sprintf("  PDF:              %s\n", result$files$pdf))
+    }
+    if (!is.null(result$files$running_es) && file.exists(result$files$running_es)) {
+      cat(sprintf("  Running ES (CSV): %s\n", result$files$running_es))
+    }
 
     cat(sprintf("\nSummary:\n"))
     cat(sprintf("  Total plots: %d\n", nrow(result$manifest)))

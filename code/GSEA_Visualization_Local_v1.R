@@ -234,46 +234,6 @@ gsea_vis_select_rows <- function(
   rows
 }
 
-gsea_vis_preview_row_index <- function(rows, preview_contrast = "") {
-  if (!is.data.frame(rows) || nrow(rows) == 0) {
-    return(NA_integer_)
-  }
-
-  preview_contrast <- gsea_vis_vector(preview_contrast)
-  preview_contrast <- if (length(preview_contrast) > 0) preview_contrast[[1]] else ""
-  if (nzchar(preview_contrast) && "contrast" %in% names(rows)) {
-    matched <- which(as.character(rows$contrast) == preview_contrast)
-    if (length(matched) > 0) {
-      return(matched[[1]])
-    }
-  }
-
-  1L
-}
-
-gsea_vis_preview_row_indices <- function(rows, preview_contrasts = character(0), preview_contrast = "") {
-  if (!is.data.frame(rows) || nrow(rows) == 0 || !"contrast" %in% names(rows)) {
-    return(integer(0))
-  }
-
-  preview_contrasts <- gsea_vis_vector(preview_contrasts)
-  if (length(preview_contrasts) == 0) {
-    preview_contrasts <- gsea_vis_vector(preview_contrast)
-  }
-  if (length(preview_contrasts) == 0) {
-    preview_contrasts <- unique(as.character(rows$contrast))
-  }
-
-  preview_contrasts <- unique(preview_contrasts)
-  preview_contrasts <- preview_contrasts[preview_contrasts %in% as.character(rows$contrast)]
-  indices <- vapply(preview_contrasts, function(contrast) {
-    matched <- which(as.character(rows$contrast) == contrast)
-    if (length(matched) == 0) NA_integer_ else matched[[1]]
-  }, integer(1))
-
-  indices[!is.na(indices)]
-}
-
 gsea_vis_rank_rows <- function(rows) {
   if (!is.data.frame(rows) || nrow(rows) == 0) {
     return(rows)
@@ -1414,11 +1374,10 @@ gsea_vis_running_es_output <- function(row, running_data) {
   )
 }
 
-gsea_vis_manifest_row <- function(row, genes, plot_id, pdf_page, preview = FALSE, genes_in_heatmap = 0L) {
+gsea_vis_manifest_row <- function(row, genes, plot_id, pdf_page, genes_in_heatmap = 0L) {
   data.frame(
     plot_id = plot_id,
     pdf_page = pdf_page,
-    preview = isTRUE(preview),
     contrast = as.character(row$contrast),
     collection = as.character(row$collection),
     pathway = as.character(row$pathway),
@@ -1441,8 +1400,6 @@ GSEA_Visualization_Local <- function(
   plot_all_pathways = FALSE,
   top_n_pathways = 1,
   top_n_by_sign = FALSE,
-  preview_contrast = "",
-  preview_contrasts = character(0),
   max_plots_in_pdf = 50,
   stop_if_too_many_plots = TRUE,
   plots_to_include = "ES+RNK+LE",
@@ -1470,9 +1427,6 @@ GSEA_Visualization_Local <- function(
   order_le_heatmap_rows_by_rank = TRUE,
   pdf_width = 8.5,
   pdf_height = 6.5,
-  image_width = 8,
-  image_height = 5.5,
-  image_dpi = 160,
   output_dir = file.path(getwd(), "_workflow_runtime", "outputs", "gsea_vis")
 ) {
   gsea_table <- gsea_vis_gsea_table(gsea_filter_result)
@@ -1517,8 +1471,6 @@ GSEA_Visualization_Local <- function(
 
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
   unlink(list.files(output_dir, pattern = "^GSEA-Vis-", full.names = TRUE), force = TRUE)
-
-  output_stamp <- gsub("[^0-9]", "", format(Sys.time(), "%Y%m%d%H%M%OS3"))
   membership_map <- gsea_vis_read_gsdb_memberships(selected, gsdb_result)
   expression_data <- NULL
   if (gsea_vis_needs_le_heatmap(plots_to_include)) {
@@ -1535,24 +1487,12 @@ GSEA_Visualization_Local <- function(
       )
     }
   }
-  plot_rows <- list()
   manifest_rows <- list()
   running_es_rows <- list()
   skipped <- list()
-  pdf_file <- file.path(output_dir, paste0("GSEA-Vis-Enrichment-Plots-", output_stamp, ".pdf"))
-  #preview_file <- file.path(output_dir, paste0("GSEA-Vis-Preview-", output_stamp, ".png"))
-  #preview_files <- list()
-
+  pdf_file <- file.path(output_dir, "GSEA-Vis-Enrichment-Plots.pdf")
   grDevices::pdf(pdf_file, width = as.numeric(pdf_width), height = as.numeric(pdf_height))
   on.exit(grDevices::dev.off(), add = TRUE)
-
-  preview_row_indices <- gsea_vis_preview_row_indices(
-    selected,
-    preview_contrasts = preview_contrasts,
-    preview_contrast = preview_contrast
-  )
-  preview_done <- logical(0)
-
   for (row_index in seq_len(nrow(selected))) {
     row <- selected[row_index, , drop = FALSE]
     contrast <- as.character(row$contrast)
@@ -1612,33 +1552,11 @@ GSEA_Visualization_Local <- function(
     )
     print(plot)
 
-    preview_name <- names(preview_row_indices)[match(row_index, preview_row_indices)]
-    should_preview <- length(preview_name) == 1 && !is.na(preview_name) && nzchar(preview_name)
-    if (should_preview) {
-      local_preview_file <- file.path(
-        output_dir,
-        paste0("GSEA-Vis-Preview-", gsea_vis_safe_file_name(preview_name), "-", output_stamp, ".png")
-      )
-      ggplot2::ggsave(
-        local_preview_file,
-        plot = plot,
-        width = as.numeric(image_width),
-        height = as.numeric(image_height),
-        bg = "white"
-      )
-      preview_files[[preview_name]] <- local_preview_file
-      if (length(preview_done) == 0) {
-        file.copy(local_preview_file, preview_file, overwrite = TRUE)
-      }
-      preview_done <- c(preview_done, preview_name)
-    }
-
     manifest_rows[[length(manifest_rows) + 1]] <- gsea_vis_manifest_row(
       row,
       genes = genes,
       plot_id = plot_id,
       pdf_page = length(manifest_rows) + 1L,
-      preview = isTRUE(should_preview),
       genes_in_heatmap = if (!is.null(expression_data)) {
         length(gsea_vis_row_leading_edge_expression_genes(row, rownames(expression_data$matrix)))
       } else {
@@ -1646,52 +1564,10 @@ GSEA_Visualization_Local <- function(
       }
     )
     running_es_rows[[length(running_es_rows) + 1]] <- gsea_vis_running_es_output(row, running_data)
-    plot_rows[[length(plot_rows) + 1]] <- row
   }
 
   grDevices::dev.off()
   on.exit(NULL, add = FALSE)
-
-  if (length(preview_done) == 0 && length(plot_rows) > 0) {
-    first_row <- plot_rows[[1]]
-    first_stats <- ranked_stats[[as.character(first_row$contrast)]]
-    first_genes <- gsea_vis_row_genes(first_row, first_stats, membership_map = membership_map)
-    first_plot <- gsea_vis_pathway_plot(
-      first_row,
-      stats = first_stats,
-      genes = first_genes,
-      expression_data = expression_data,
-      plots_to_include = plots_to_include,
-      running_score_line_color = running_score_line_color,
-      add_max_deviation_line = add_max_deviation_line,
-      show_es_rank_bar = isTRUE(show_es_rank_bar),
-      show_es_le_highlight = isTRUE(show_es_le_highlight),
-      rank_area_color = rank_area_color,
-      show_rnk_le_highlight = isTRUE(show_rnk_le_highlight),
-      show_rnk_peak_line = isTRUE(show_rnk_peak_line),
-      display_leading_edge_genes = isTRUE(display_leading_edge_genes),
-      number_of_leading_edge_genes_to_display = number_of_leading_edge_genes_to_display,
-      font_size_of_leading_edge_genes = font_size_of_leading_edge_genes,
-      heatmap_transform = heatmap_transform,
-      max_le_genes_heatmap = max_le_genes_heatmap,
-      cluster_le_heatmap_rows = isTRUE(cluster_le_heatmap_rows),
-      cluster_le_heatmap_columns = isTRUE(cluster_le_heatmap_columns),
-      show_le_heatmap_sample_names = gsea_vis_bool(show_le_heatmap_sample_names, FALSE),
-      show_le_heatmap_gene_names = gsea_vis_bool(show_le_heatmap_gene_names, TRUE),
-      show_le_heatmap_rank_labels = gsea_vis_bool(show_le_heatmap_rank_labels, TRUE),
-      order_le_heatmap_rows_by_rank = gsea_vis_bool(order_le_heatmap_rows_by_rank, TRUE),
-      pdf_height = as.numeric(pdf_height),
-      pdf_width  = as.numeric(pdf_width)
-    )
-    ggplot2::ggsave(
-      preview_file,
-      plot = first_plot,
-      width = as.numeric(image_width),
-      height = as.numeric(image_height),
-      bg = "white"
-    )
-    preview_files[[as.character(first_row$contrast)]] <- preview_file
-  }
 
   manifest <- if (length(manifest_rows) > 0) {
     do.call(rbind, manifest_rows)
@@ -1699,7 +1575,6 @@ GSEA_Visualization_Local <- function(
     data.frame(
       plot_id = character(0),
       pdf_page = integer(0),
-      preview = logical(0),
       contrast = character(0),
       collection = character(0),
       pathway = character(0),
@@ -1716,8 +1591,21 @@ GSEA_Visualization_Local <- function(
   if (nrow(manifest) == 0 && file.exists(pdf_file)) {
     unlink(pdf_file, force = TRUE)
   }
+  if (nrow(manifest) == 0) {
+    stop(
+      paste0(
+        "GSEA-Vis generated no plots. ",
+        if (length(skipped) > 0) {
+          paste0("All selected pathways were skipped. First reason: ", skipped[[1]])
+        } else {
+          "No selected pathway produced plottable data."
+        }
+      ),
+      call. = FALSE
+    )
+  }
 
-  #manifest_file <- file.path(output_dir, paste0("GSEA-Vis-Manifest-", output_stamp, ".csv"))
+  #manifest_file <- file.path(output_dir, "GSEA-Vis-Manifest.csv")
   #utils::write.csv(manifest, manifest_file, row.names = FALSE)
   running_es <- if (length(running_es_rows) > 0) {
     do.call(rbind, running_es_rows)
@@ -1734,29 +1622,25 @@ GSEA_Visualization_Local <- function(
       stringsAsFactors = FALSE
     )
   }
-  running_es_file <- file.path(output_dir, paste0("GSEA-Vis-RunningES-", output_stamp, ".csv"))
+  running_es_file <- file.path(output_dir, "GSEA-Vis-RunningES.csv")
   utils::write.csv(running_es, running_es_file, row.names = FALSE)
   skipped_file <- NULL
   if (length(skipped) > 0) {
-    skipped_file <- file.path(output_dir, paste0("GSEA-Vis-Skipped-", output_stamp, ".csv"))
+    skipped_file <- file.path(output_dir, "GSEA-Vis-Skipped.csv")
     utils::write.csv(
       data.frame(reason = unlist(skipped, use.names = FALSE), stringsAsFactors = FALSE),
       skipped_file,
       row.names = FALSE
     )
-  }#
+  }
 
   list(
-    #manifest = manifest,
+    manifest = manifest,
     running_es = running_es,
     plots = list(
-      #preview = if (file.exists(preview_file)) normalizePath(preview_file, winslash = "/", mustWork = FALSE) else NULL,
-      #previews = lapply(preview_files, function(path) normalizePath(path, winslash = "/", mustWork = FALSE)),
       pdf = if (file.exists(pdf_file)) normalizePath(pdf_file, winslash = "/", mustWork = FALSE) else NULL
     ),
     files = list(
-      #preview = if (file.exists(preview_file)) normalizePath(preview_file, winslash = "/", mustWork = FALSE) else NULL,
-      #previews = lapply(preview_files, function(path) normalizePath(path, winslash = "/", mustWork = FALSE)),
       pdf = if (file.exists(pdf_file)) normalizePath(pdf_file, winslash = "/", mustWork = FALSE) else NULL,
       #manifest = normalizePath(manifest_file, winslash = "/", mustWork = FALSE),
       running_es = normalizePath(running_es_file, winslash = "/", mustWork = FALSE),
@@ -1765,7 +1649,7 @@ GSEA_Visualization_Local <- function(
     skipped = unlist(skipped, use.names = FALSE),
     message = paste0(
       "GSEA-Vis complete: generated ",
-      #nrow(manifest),
+      nrow(manifest),
       " ",
       as.character(plots_to_include %||% "ES+RNK"),
       " plot(s)",
