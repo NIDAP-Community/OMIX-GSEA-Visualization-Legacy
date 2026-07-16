@@ -552,15 +552,15 @@ main <- function() {
       running_es = file.path(args$output_dir, "GSEA-Vis-RunningES.csv"),
       running_es_rds = file.path(args$output_dir, "GSEA-Vis-RunningES.rds")
     )
-    if (!is.null(result$files$pdf) && file.exists(result$files$pdf)) {
-      file.copy(result$files$pdf, stable$pdf, overwrite = TRUE)
-    }
-    if (!is.null(result$files$running_es) && file.exists(result$files$running_es)) {
-      file.copy(result$files$running_es, stable$running_es, overwrite = TRUE)
-    }
-    if (is.data.frame(result$running_es)) {
-      saveRDS(result$running_es, stable$running_es_rds)
-    }
+    #if (!is.null(result$files$pdf) && file.exists(result$files$pdf)) {
+    #  file.copy(result$files$pdf, stable$pdf, overwrite = TRUE)
+    #}
+    #if (!is.null(result$files$running_es) && file.exists(result$files$running_es)) {
+    #  file.copy(result$files$running_es, stable$running_es, overwrite = TRUE)
+    #}
+    #if (is.data.frame(result$running_es)) {
+    #  saveRDS(result$running_es, stable$running_es_rds)
+    #}
 
     cat("Generated files:\n")
     if (file.exists(stable$pdf))           cat(sprintf("  PDF:              %s\n", stable$pdf))

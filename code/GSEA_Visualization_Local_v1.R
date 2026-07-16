@@ -1540,8 +1540,8 @@ GSEA_Visualization_Local <- function(
   running_es_rows <- list()
   skipped <- list()
   pdf_file <- file.path(output_dir, paste0("GSEA-Vis-Enrichment-Plots-", output_stamp, ".pdf"))
-  preview_file <- file.path(output_dir, paste0("GSEA-Vis-Preview-", output_stamp, ".png"))
-  preview_files <- list()
+  #preview_file <- file.path(output_dir, paste0("GSEA-Vis-Preview-", output_stamp, ".png"))
+  #preview_files <- list()
 
   grDevices::pdf(pdf_file, width = as.numeric(pdf_width), height = as.numeric(pdf_height))
   on.exit(grDevices::dev.off(), add = TRUE)
@@ -1717,8 +1717,8 @@ GSEA_Visualization_Local <- function(
     unlink(pdf_file, force = TRUE)
   }
 
-  manifest_file <- file.path(output_dir, paste0("GSEA-Vis-Manifest-", output_stamp, ".csv"))
-  utils::write.csv(manifest, manifest_file, row.names = FALSE)
+  #manifest_file <- file.path(output_dir, paste0("GSEA-Vis-Manifest-", output_stamp, ".csv"))
+  #utils::write.csv(manifest, manifest_file, row.names = FALSE)
   running_es <- if (length(running_es_rows) > 0) {
     do.call(rbind, running_es_rows)
   } else {
