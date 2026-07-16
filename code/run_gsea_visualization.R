@@ -29,16 +29,26 @@ get_args <- function() {
                 help = "Comma-separated contrast names for keep/remove mode [default: '']"),
     make_option(c("--top_n_pathways"), type = "integer", default = 1L,
                 help = "Top pathways per contrast/collection. 0 = all pathways. [default: 1]"),
+    make_option(c("--top_n_by_sign"), type = "logical", default = FALSE,
+                help = "When TRUE, select top_n_pathways separately for positively (ES>0) and negatively (ES<0) enriched pathways. [default: FALSE]"),
     make_option(c("--max_plots_in_pdf"), type = "integer", default = 0L,
                 help = "Total plots in PDF (global ceiling). 0 = no limit. [default: 0]"),
     make_option(c("--plots_to_include"), type = "character", default = "ES+RNK+LE",
-                help = "Plot types: ES, ES+RNK, ES+RNK+LE, LE [default: ES+RNK+LE]"),
+                help = "Plot types: ES, ES+RNK, ES+LE, ES+RNK+LE, LE [default: ES+RNK+LE]"),
     make_option(c("--running_score_line_color"), type = "character", default = "ES sign",
                 help = "Line color: 'ES sign' or 'green' [default: ES sign]"),
-    make_option(c("--add_max_deviation_line"), type = "character", default = "coordinate",
-                help = "Max deviation guide line: 'coordinate', 'full', or 'none' [default: coordinate]"),
-    make_option(c("--rank_area_color"), type = "character", default = "grey",
-                help = "RNK area fill color: 'grey' or 'red_blue' [default: grey]"),
+    make_option(c("--add_max_deviation_line"), type = "character", default = "xy-coordinate",
+                help = "Max deviation guide line: 'x-coordinate', 'y-coordinate', 'xy-coordinate', or 'none' [default: xy-coordinate]"),
+    make_option(c("--rank_area_color"), type = "character", default = "red/blue by Gene score",
+                help = "RNK area fill color: 'grey' or 'red/blue by Gene score' [default: red/blue by Gene score]"),
+    make_option(c("--show_es_rank_bar"), type = "logical", default = FALSE,
+                help = "Show colored rank bar strip and +/- signs in ES panel [default: FALSE]"),
+    make_option(c("--show_rnk_peak_line"), type = "logical", default = TRUE,
+                help = "Show dashed vertical line at peak ES rank in RNK panel [default: TRUE]"),
+    make_option(c("--show_rnk_le_highlight"), type = "logical", default = TRUE,
+                help = "Show leading-edge highlight rectangle in RNK panel [default: TRUE]"),
+    make_option(c("--show_es_le_highlight"), type = "logical", default = TRUE,
+                help = "Show leading-edge highlight rectangle in ES panel [default: TRUE]"),
     make_option(c("--heatmap_transform"), type = "character", default = "z-score",
                 help = "Heatmap transform: 'z-score', 'center by row mean', 'none' [default: z-score]"),
     make_option(c("--max_le_genes_heatmap"), type = "integer", default = 50,
@@ -350,8 +360,8 @@ main <- function() {
   args$heatmap_gene_names_column   <- non_empty(args$heatmap_gene_names_column)   %||% "gene"
   args$heatmap_sample_names_column <- non_empty(args$heatmap_sample_names_column) %||% "Sample"
   args$heatmap_group_column        <- non_empty(args$heatmap_group_column)        %||% "Group"
-  args$add_max_deviation_line      <- non_empty(args$add_max_deviation_line)      %||% "coordinate"
-  args$rank_area_color             <- non_empty(args$rank_area_color)             %||% "grey"
+  args$add_max_deviation_line      <- non_empty(args$add_max_deviation_line)      %||% "xy-coordinate"
+  args$rank_area_color             <- non_empty(args$rank_area_color)             %||% "red/blue by Gene score"
 
   # ── 1. Load GSEA Filter Results (flat filtered table) ──────────────────────
   gsea_filter_path <- args$gsea_filter_results %||%
@@ -418,6 +428,7 @@ main <- function() {
   top_n_raw      <- args$top_n_pathways %||% 1L
   plot_all_paths <- is.na(top_n_raw) || top_n_raw <= 0L
   top_n_pathways <- if (plot_all_paths) 1L else as.integer(top_n_raw)
+  top_n_by_sign  <- isTRUE(gsea_vis_bool(args$top_n_by_sign, FALSE))
 
   # max_plots_in_pdf: 0 = no limit; positive integer = global PDF ceiling
   max_raw          <- args$max_plots_in_pdf %||% 0L
@@ -452,6 +463,7 @@ main <- function() {
   cat(sprintf("  Resolved contrasts: %s\n",
               if (length(plot_contrasts) > 0) paste(plot_contrasts, collapse = ", ") else "all"))
   cat(sprintf("  Top N pathways: %s\n", if (plot_all_paths) "all" else top_n_pathways))
+  cat(sprintf("  Top N by ES sign: %s\n", if (top_n_by_sign) "yes (separate up/down)" else "no"))
   cat(sprintf("  Max plots in PDF: %s\n", if (max_plots_unlimited) "no limit" else max_plots_in_pdf))
   cat(sprintf("  Plots to include: %s\n", plots_to_include))
   cat(sprintf("  Output directory: %s\n\n", args$output_dir))
@@ -487,6 +499,7 @@ main <- function() {
     plot_contrasts        = plot_contrasts,
     plot_all_pathways     = plot_all_paths,
     top_n_pathways        = top_n_pathways,
+    top_n_by_sign         = top_n_by_sign,
     preview_contrast      = "",
     preview_contrasts     = preview_contrasts,
     max_plots_in_pdf      = max_plots_in_pdf,
@@ -500,7 +513,7 @@ main <- function() {
       args$running_score_line_color   # passthrough for raw values
     ),
     add_max_deviation_line   = switch(
-      args$add_max_deviation_line %||% "x-coordinate",
+      args$add_max_deviation_line %||% "xy-coordinate",
       "x-coordinate"  = "coordinate",
       "y-coordinate"  = "horizontal",
       "xy-coordinate" = "both",
@@ -509,6 +522,10 @@ main <- function() {
       args$add_max_deviation_line
     ),
     rank_area_color          = args$rank_area_color %||% "grey",
+    show_es_rank_bar         = gsea_vis_bool(args$show_es_rank_bar, TRUE),
+    show_rnk_peak_line       = gsea_vis_bool(args$show_rnk_peak_line, TRUE),
+    show_rnk_le_highlight    = gsea_vis_bool(args$show_rnk_le_highlight, TRUE),
+    show_es_le_highlight     = gsea_vis_bool(args$show_es_le_highlight, TRUE),
     heatmap_gene_names_column   = args$heatmap_gene_names_column,
     heatmap_sample_names_column = args$heatmap_sample_names_column,
     heatmap_group_column        = args$heatmap_group_column,
@@ -529,30 +546,26 @@ main <- function() {
   cat(sprintf("\n%s\n\n", result$message))
   
   if (is.data.frame(result$manifest) && nrow(result$manifest) > 0) {
-    cat("Generated files:\n")
-    if (!is.null(result$files$pdf) && file.exists(result$files$pdf)) {
-      cat(sprintf("  PDF: %s\n", result$files$pdf))
-    }
-    if (!is.null(result$files$preview) && file.exists(result$files$preview)) {
-      cat(sprintf("  Preview: %s\n", result$files$preview))
-    }
-    if (!is.null(result$files$running_es) && file.exists(result$files$running_es)) {
-      cat(sprintf("  Running ES: %s\n", result$files$running_es))
-    }
-
     # Copy key outputs to stable filenames so App Panel tabs resolve correctly
     stable <- list(
       pdf        = file.path(args$output_dir, "GSEA-Vis-Enrichment-Plots.pdf"),
-      running_es = file.path(args$output_dir, "GSEA-Vis-RunningES.csv")
+      running_es = file.path(args$output_dir, "GSEA-Vis-RunningES.csv"),
+      running_es_rds = file.path(args$output_dir, "GSEA-Vis-RunningES.rds")
     )
     if (!is.null(result$files$pdf) && file.exists(result$files$pdf)) {
       file.copy(result$files$pdf, stable$pdf, overwrite = TRUE)
-      cat(sprintf("  Stable PDF: %s\n", stable$pdf))
     }
     if (!is.null(result$files$running_es) && file.exists(result$files$running_es)) {
       file.copy(result$files$running_es, stable$running_es, overwrite = TRUE)
-      cat(sprintf("  Stable Running ES: %s\n", stable$running_es))
     }
+    if (is.data.frame(result$running_es)) {
+      saveRDS(result$running_es, stable$running_es_rds)
+    }
+
+    cat("Generated files:\n")
+    if (file.exists(stable$pdf))           cat(sprintf("  PDF:              %s\n", stable$pdf))
+    if (file.exists(stable$running_es))    cat(sprintf("  Running ES (CSV): %s\n", stable$running_es))
+    if (file.exists(stable$running_es_rds)) cat(sprintf("  Running ES (RDS): %s\n", stable$running_es_rds))
 
     cat(sprintf("\nSummary:\n"))
     cat(sprintf("  Total plots: %d\n", nrow(result$manifest)))

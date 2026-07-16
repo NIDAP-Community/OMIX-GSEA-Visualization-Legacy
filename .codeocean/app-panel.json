@@ -7,9 +7,9 @@
 	},
 	"datasets": [
 		{
-			"id": "823c9efa-1f4f-4b11-8d4d-a88feade094e",
+			"id": "e5c4e095-f2e5-48ac-8148-d7fdb8673e05",
 			"name": "GSEA Filter Results",
-			"help_text": "Demo GSEA Filter output. Replace with your own, or upload a file above."
+			"help_text": "GSEA Filter output (both directions). Replace with your own, or upload a file above."
 		},
 		{
 			"id": "28035d52-03e6-4761-8f50-72d48af496d1",
@@ -39,9 +39,14 @@
 			"help_text": "Configure what to visualize and how the output is generated"
 		},
 		{
-			"id": "plot_options",
+			"id": "es_plot",
 			"name": "ES Plot Options",
 			"help_text": "Customize the running enrichment score curve and deviation guide line"
+		},
+		{
+			"id": "rnk_plot",
+			"name": "RNK Plot Options",
+			"help_text": "Customize the ranked gene score area in the RNK panel"
 		},
 		{
 			"id": "heatmap",
@@ -121,13 +126,14 @@
 			"category": "selection",
 			"name": "Panels to include",
 			"param_name": "plots_to_include",
-			"help_text": "Select which panels to include in each plot.\n\nES — Running score (enrichment score curve)\nRNK — Ranked gene list (gene score distribution)\nLE — Leading edge heatmap (requires expression data)",
+			"help_text": "Select which panels to include in each plot.\n\nES — Running score (enrichment score curve)\nRNK — Ranked gene list (gene score distribution)\nLE — Leading edge heatmap (requires expression data)\n\nES+LE — Enrichment score curve alongside the leading edge heatmap (no RNK panel)",
 			"type": "list",
 			"value_type": "string",
-			"default_value": "ES+RNK",
+			"default_value": "ES+RNK+LE",
 			"extra_data": [
 				"ES+RNK+LE",
 				"ES+RNK",
+				"ES+LE",
 				"ES",
 				"LE"
 			]
@@ -168,6 +174,20 @@
 			"minimum": 0
 		},
 		{
+			"id": "topNBySign",
+			"category": "selection",
+			"name": "Top N by ES sign (up/down separately)",
+			"param_name": "top_n_by_sign",
+			"help_text": "When TRUE, the Top N limit is applied separately to positively enriched (ES \u003e 0) and negatively enriched (ES \u003c 0) pathways.\n\nExample: Top N = 2 with this ON → up to 2 upregulated + 2 downregulated pathways per contrast × collection.",
+			"type": "list",
+			"value_type": "string",
+			"default_value": "FALSE",
+			"extra_data": [
+				"FALSE",
+				"TRUE"
+			]
+		},
+		{
 			"id": "maxPlotsInPdf",
 			"category": "selection",
 			"name": "Total plots in PDF",
@@ -204,7 +224,7 @@
 		},
 		{
 			"id": "ldUmhGr65WyIp3AK",
-			"category": "plot_options",
+			"category": "es_plot",
 			"name": "Running score line color",
 			"param_name": "running_score_line_color",
 			"help_text": "Color of the running enrichment score curve.\n\nred/blue by ES — red for positive ES (upregulated pathway), blue for negative ES (downregulated)\ngreen — fixed green color regardless of ES direction\n\nTitle text and guide lines are always black.",
@@ -217,14 +237,28 @@
 			]
 		},
 		{
-			"id": "addMaxDevLine",
-			"category": "plot_options",
-			"name": "Max deviation guide line",
-			"param_name": "add_max_deviation_line",
-			"help_text": "Dashed guide line at the maximum enrichment score point.\n\nx-coordinate: vertical line at the gene rank (x-axis) of the peak ES.\ny-coordinate: horizontal line at the ES value (y-axis) of the peak ES.\nxy-coordinate: crosshair — both lines together.\nnone: no guide line.",
+			"id": "showEsRankBar",
+			"category": "es_plot",
+			"name": "Show gene score bar",
+			"param_name": "show_es_rank_bar",
+			"help_text": "Show the colored gene-score rank bar strip and ± sign labels at the bottom of the ES panel.\n\nTRUE — display rank bar (red→white→blue gradient) and +/− signs.\nFALSE — hide rank bar and signs; ES curve and rug ticks are unaffected.",
 			"type": "list",
 			"value_type": "string",
-			"default_value": "x-coordinate",
+			"default_value": "FALSE",
+			"extra_data": [
+				"FALSE",
+				"TRUE"
+			]
+		},
+		{
+			"id": "addMaxDevLine",
+			"category": "es_plot",
+			"name": "Peak ES guide",
+			"param_name": "add_max_deviation_line",
+			"help_text": "Dashed guide at the peak enrichment score point.\n\nx-coordinate — vertical line at the gene rank of peak ES.\ny-coordinate — horizontal line at the peak ES value.\nxy-coordinate — crosshair (both lines).\nnone — no guide.",
+			"type": "list",
+			"value_type": "string",
+			"default_value": "xy-coordinate",
 			"extra_data": [
 				"x-coordinate",
 				"y-coordinate",
@@ -233,17 +267,59 @@
 			]
 		},
 		{
-			"id": "rankAreaColor",
-			"category": "plot_options",
-			"name": "RNK area fill color",
-			"param_name": "rank_area_color",
-			"help_text": "Fill color for the gene score area in the RNK panel.\n\ngrey — neutral grey fill regardless of pathway direction.\nred_blue — red for positive scores, blue for negative scores, matching the ES strip coloring.",
+			"id": "showEsLeHighlight",
+			"category": "es_plot",
+			"name": "Show LE highlight",
+			"param_name": "show_es_le_highlight",
+			"help_text": "Show the semi-transparent leading-edge highlight rectangle in the ES panel.\n\nTRUE — highlight the leading-edge gene region (colored by ES sign).\nFALSE — no highlight.",
 			"type": "list",
 			"value_type": "string",
-			"default_value": "grey",
+			"default_value": "TRUE",
+			"extra_data": [
+				"TRUE",
+				"FALSE"
+			]
+		},
+		{
+			"id": "rankAreaColor",
+			"category": "rnk_plot",
+			"name": "Gene score area color",
+			"param_name": "rank_area_color",
+			"help_text": "Fill color for the gene score area in the RNK panel.\n\ngrey — neutral grey area regardless of pathway direction.\nred/blue by gene score — per-gene gradient (red → white → blue by score value), matching the ES strip coloring.",
+			"type": "list",
+			"value_type": "string",
+			"default_value": "red/blue by gene score",
 			"extra_data": [
 				"grey",
-				"red_blue"
+				"red/blue by gene score"
+			]
+		},
+		{
+			"id": "showRnkPeakLine",
+			"category": "rnk_plot",
+			"name": "Show peak ES guide",
+			"param_name": "show_rnk_peak_line",
+			"help_text": "Show a dashed vertical line at the gene rank where the enrichment score peaks — the same x-position as the Peak ES guide in the ES panel above.\n\nTRUE — show dashed vertical guide at peak ES rank (default).\nFALSE — no guide.",
+			"type": "list",
+			"value_type": "string",
+			"default_value": "TRUE",
+			"extra_data": [
+				"TRUE",
+				"FALSE"
+			]
+		},
+		{
+			"id": "showRnkLeHighlight",
+			"category": "rnk_plot",
+			"name": "Show LE highlight",
+			"param_name": "show_rnk_le_highlight",
+			"help_text": "Show the semi-transparent leading-edge highlight rectangle in the RNK panel.\n\nTRUE — highlight the leading-edge gene region (colored by ES sign).\nFALSE — no highlight.",
+			"type": "list",
+			"value_type": "string",
+			"default_value": "TRUE",
+			"extra_data": [
+				"TRUE",
+				"FALSE"
 			]
 		},
 		{
@@ -367,8 +443,13 @@
 		},
 		{
 			"file_name": "GSEA-Vis-RunningES.csv",
-			"title": "Running Enrichment Scores",
-			"description": "Running enrichment score data for all plots"
+			"title": "Running Enrichment Scores (CSV)",
+			"description": "Running enrichment score data for all plots (CSV)"
+		},
+		{
+			"file_name": "GSEA-Vis-RunningES.rds",
+			"title": "Running Enrichment Scores (RDS)",
+			"description": "Running enrichment score data for all plots (RDS)"
 		}
 	]
 }

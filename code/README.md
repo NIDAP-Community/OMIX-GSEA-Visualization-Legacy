@@ -7,13 +7,13 @@ Generates enrichment plots from GSEA Filter and GSEA Preranked results, includin
 
 ## Input Requirements
 
-### Required (from GSEA Filter capsule)
-- `gsea_filter_result.rds` - Filtered GSEA results table
-- `gsea_preranked_result.rds` - GSEA Preranked results with ranked statistics
+### Required
+- `gsea_filter_result.rds` or `gsea_filter_result.csv`- GSEA results table filtered recomended
+- `deg_table.rds` or `deg_table.csv` - DEG results (ranking statistics)
+- `sample_metadata.rds` or `sample_metadata.csv` - sample id and grouping columns
 
 ### Optional
-- `batch_result.rds` - Batch-corrected expression data (required for LE heatmaps)
-- `gsdb_result.rds` - Gene Set Database result (for gene membership lookup)
+- `batch_result.rds` - NormalBatch-corrected expression data (required for LE heatmaps)
 
 ## Usage
 
@@ -44,7 +44,7 @@ Generates enrichment plots from GSEA Filter and GSEA Preranked results, includin
 ```bash
 Rscript /code/run_gsea_visualization.R \
   --gsea_filter_result /data/gsea_filter_result.rds \
-  --gsea_preranked_result /data/gsea_preranked_result.rds \
+  --sample_metadata.rds /data/sample_metadata.rds \
   --batch_result /data/batch_result.rds \
   --plot_contrasts "Treatment_vs_Control,Drug_vs_Vehicle" \
   --top_n_pathways 3 \

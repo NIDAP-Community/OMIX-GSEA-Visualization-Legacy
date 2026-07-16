@@ -178,7 +178,8 @@ gsea_vis_select_rows <- function(
   gsea_table,
   plot_contrasts = character(0),
   plot_all_pathways = FALSE,
-  top_n_pathways = 1
+  top_n_pathways = 1,
+  top_n_by_sign = FALSE
 ) {
   plot_contrasts <- gsea_vis_vector(plot_contrasts)
   rows <- gsea_table
@@ -193,17 +194,36 @@ gsea_vis_select_rows <- function(
   key_cols <- intersect(c("contrast", "collection", "pathway"), names(rows))
   rows <- rows[!duplicated(rows[key_cols]), , drop = FALSE]
   rows <- gsea_vis_rank_rows(rows)
+
   if (!isTRUE(plot_all_pathways)) {
     top_n_pathways <- max(1L, as.integer(top_n_pathways %||% 1L))
     by_cols <- intersect(c("contrast", "collection"), names(rows))
-    if (length(by_cols) > 0) {
+
+    if (isTRUE(top_n_by_sign) && "ES" %in% names(rows)) {
+      # Split each contrast × collection group by ES sign, then take top N from each sign.
+      # Work on a plain data.frame copy to avoid mutating grouped tibbles.
+      rows_df   <- as.data.frame(rows, stringsAsFactors = FALSE)
+      es_vals   <- suppressWarnings(as.numeric(rows_df[["ES"]]))
+      es_sign   <- ifelse(is.na(es_vals) | es_vals >= 0, "up", "down")
+      group_factor <- if (length(by_cols) > 0) {
+        interaction(
+          c(as.list(rows_df[, by_cols, drop = FALSE]), list(es_sign)),
+          drop = TRUE
+        )
+      } else {
+        factor(es_sign)
+      }
+      groups <- split(seq_len(nrow(rows_df)), group_factor)
+      keep   <- unlist(lapply(groups, function(idx) utils::head(idx, top_n_pathways)),
+                       use.names = FALSE)
+      rows <- rows[sort(keep), , drop = FALSE]
+    } else if (length(by_cols) > 0) {
       groups <- split(
         seq_len(nrow(rows)),
         do.call(interaction, c(as.list(rows[, by_cols, drop = FALSE]), list(drop = TRUE)))
       )
-      keep <- unlist(lapply(groups, function(index) {
-        utils::head(index, top_n_pathways)
-      }), use.names = FALSE)
+      keep <- unlist(lapply(groups, function(idx) utils::head(idx, top_n_pathways)),
+                     use.names = FALSE)
       rows <- rows[sort(keep), , drop = FALSE]
     } else {
       rows <- utils::head(rows, top_n_pathways)
@@ -759,7 +779,9 @@ gsea_vis_le_heatmap_plot <- function(
   show_le_heatmap_sample_names = FALSE,
   show_le_heatmap_gene_names = TRUE,
   show_le_heatmap_rank_labels = TRUE,
-  order_le_heatmap_rows_by_rank = TRUE
+  order_le_heatmap_rows_by_rank = TRUE,
+  pdf_height = 6.5,
+  pdf_width  = 8.5
 ) {
   if (!requireNamespace("ComplexHeatmap", quietly = TRUE)) {
     stop("GSEA-Vis leading-edge heatmaps require the ComplexHeatmap package.", call. = FALSE)
@@ -806,6 +828,24 @@ gsea_vis_le_heatmap_plot <- function(
     row_display_labels <- row_display_labels[seq_len(max_le_genes_heatmap)]
   }
 
+  # ── Bounded-square cell sizing + auto font ────────────────────────────────
+  n_rows <- nrow(mat)
+  n_cols <- ncol(mat)
+  # Available height for heatmap body (subtract title, annotation, legend overhead)
+  avail_h_pt <- max(36, (as.numeric(pdf_height) - 0.8) * 72)
+  # Available body width: LE column ≈ 34.6% of page width; subtract fixed
+  # overhead for row dendrogram (~28 pt), row labels (~70 pt), colour legend (~30 pt)
+  avail_w_body_pt <- max(20, as.numeric(pdf_width) * 0.346 * 72 - 128)
+  # Cell size: width-driven for square cells, capped by natural height-per-row
+  # so cells never exceed what the available height allows
+  cell_w_driven  <- avail_w_body_pt / n_cols
+  cell_h_natural <- avail_h_pt / n_rows
+  cell_size_pt   <- max(4, min(cell_w_driven, cell_h_natural, 14))
+  # Gene (row) label font: ~65% of cell size, clamped to [4, 9] pt
+  row_font_size <- max(4, min(9, cell_size_pt * 0.65))
+  # Sample (column) label font: driven by cell width, clamped to [4, 7] pt
+  col_font_size <- max(4, min(7, cell_w_driven * 0.50))
+
   group_values <- NULL
   top_annotation <- NULL
   metadata <- expression_data$metadata
@@ -819,7 +859,7 @@ gsea_vis_le_heatmap_plot <- function(
       Group = group_values,
       col = if (length(group_colors) > 0) list(Group = group_colors) else NULL,
       annotation_height = grid::unit(0.3, "cm"),
-      annotation_name_side = "left",
+      show_annotation_name = FALSE,
       annotation_legend_param = list(
         title_gp = grid::gpar(fontsize = 6),
         grid_width = grid::unit(0.25, "cm"),
@@ -838,7 +878,7 @@ gsea_vis_le_heatmap_plot <- function(
         Group = group_values,
         col = if (length(group_colors) > 0) list(Group = group_colors) else NULL,
         annotation_height = grid::unit(0.3, "cm"),
-        annotation_name_side = "left",
+        show_annotation_name = FALSE,
         annotation_legend_param = list(
           title_gp = grid::gpar(fontsize = 6),
           grid_width = grid::unit(0.25, "cm"),
@@ -871,8 +911,9 @@ gsea_vis_le_heatmap_plot <- function(
     show_column_names = gsea_vis_bool(show_le_heatmap_sample_names, FALSE),
     show_row_names = gsea_vis_bool(show_le_heatmap_gene_names, TRUE),
     row_labels = row_display_labels,
-    row_names_gp = grid::gpar(fontsize = 7),
-    column_names_gp = grid::gpar(fontsize = 7),
+    row_names_gp = grid::gpar(fontsize = row_font_size),
+    column_names_gp = grid::gpar(fontsize = col_font_size),
+    column_names_rot = 45,
     heatmap_legend_param = list(
       color_bar = "continuous",
       title_gp = grid::gpar(fontsize = 6),
@@ -894,7 +935,11 @@ gsea_vis_es_plot <- function(
   row,
   running_data,
   line_color,
-  add_max_deviation_line = "coordinate",
+  add_max_deviation_line = "both",
+  show_es_rank_bar = FALSE,
+  show_es_le_highlight = TRUE,
+  leading_edge_genes = character(0),
+  le_count = NULL,
   show_x_label = FALSE
 ) {
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
@@ -923,22 +968,56 @@ gsea_vis_es_plot <- function(
   all_ranks$score_limited <- score_limited
   margins <- gsea_vis_color_margins()
   strip_y <- es_range[[1]] - (0.08 * es_span)
+
+  # Compute leading-edge x-range for the optional ES highlight band
+  le_genes_es  <- intersect(leading_edge_genes, running_data$gene)
+  nes_val_es   <- suppressWarnings(as.numeric(row$NES))
+  if (!is.na(nes_val_es) && nes_val_es < 0) {
+    le_flags_es <- running_data$gene %in% le_genes_es & running_data$score < 0
+  } else {
+    le_flags_es <- running_data$gene %in% le_genes_es & running_data$score > 0
+  }
+  le_idx_es  <- which(le_flags_es)
+  le_xmin_es <- if (length(le_idx_es) > 0) min(le_idx_es) else NA_real_
+  le_xmax_es <- if (length(le_idx_es) > 0) max(le_idx_es) else NA_real_
+
   plot <- ggplot2::ggplot(running_data, ggplot2::aes(x = index, y = running_es)) +
-    ggplot2::geom_tile(
-      data = all_ranks,
-      ggplot2::aes(x = index, y = strip_y, fill = score_limited),
-      inherit.aes = FALSE,
-      width = 1,
-      height = 0.06 * es_span,
-      show.legend = FALSE
-    ) +
-    ggplot2::scale_fill_gradient2(
-      high = margins["up"],
-      low = margins["dn"],
-      mid = margins["md"],
-      midpoint = 0,
-      limits = c(-1, 1) * score_clip
-    ) +
+    {
+      if (isTRUE(show_es_rank_bar)) {
+        ggplot2::geom_tile(
+          data = all_ranks,
+          ggplot2::aes(x = index, y = strip_y, fill = score_limited),
+          inherit.aes = FALSE,
+          width = 1,
+          height = 0.06 * es_span,
+          show.legend = FALSE
+        )
+      }
+    } +
+    {
+      if (isTRUE(show_es_rank_bar)) {
+        ggplot2::scale_fill_gradient2(
+          high = margins["up"],
+          low = margins["dn"],
+          mid = margins["md"],
+          midpoint = 0,
+          limits = c(-1, 1) * score_clip
+        )
+      }
+    } +
+    {
+      if (isTRUE(show_es_le_highlight) && is.finite(le_xmin_es) && is.finite(le_xmax_es)) {
+        ggplot2::annotate(
+          geom  = "rect",
+          xmin  = le_xmin_es,
+          xmax  = le_xmax_es,
+          ymin  = -Inf,
+          ymax  = Inf,
+          fill  = line_color,
+          alpha = 0.08
+        )
+      }
+    } +
     ggplot2::geom_hline(yintercept = 0, linewidth = 0.3, color = "#555555") +
     ggplot2::geom_line(linewidth = 0.75, color = line_color) +
     ggplot2::geom_rug(
@@ -951,32 +1030,77 @@ gsea_vis_es_plot <- function(
       color = "#555555"
     ) +
     ggplot2::labs(
-      title = gsea_vis_format_es(row, running_data),
+      title = {
+        t <- gsea_vis_format_es(row, running_data)
+        if (!is.null(le_count) && is.finite(le_count)) {
+          paste0(t, " \u00b7 ", as.integer(le_count), " LE genes")
+        } else {
+          t
+        }
+      },
       x = if (isTRUE(show_x_label)) "Gene Rank" else NULL,
       y = "Running Score"
     ) +
-    ggplot2::annotate(
-      geom = "text",
-      x = 1L,
-      y = strip_y,
-      label = "+",
-      hjust = 1.5,
-      vjust = 0.5,
-      size = 2.5,
-      fontface = "bold",
-      color = margins["up"]
-    ) +
-    ggplot2::annotate(
-      geom = "text",
-      x = max(running_data$index),
-      y = strip_y,
-      label = "-",
-      hjust = -0.5,
-      vjust = 0.5,
-      size = 2.5,
-      fontface = "bold",
-      color = margins["dn"]
-    ) +
+    {
+      if (isTRUE(show_es_rank_bar)) {
+        ggplot2::annotate(
+          geom = "text",
+          x = 1L,
+          y = strip_y,
+          label = "+",
+          hjust = 1.5,
+          vjust = 0.5,
+          size = 2.5,
+          fontface = "bold",
+          color = margins["up"]
+        )
+      }
+    } +
+    {
+      if (isTRUE(show_es_rank_bar)) {
+        ggplot2::annotate(
+          geom = "text",
+          x = max(running_data$index),
+          y = strip_y,
+          label = "-",
+          hjust = -0.5,
+          vjust = 0.5,
+          size = 2.5,
+          fontface = "bold",
+          color = margins["dn"]
+        )
+      }
+    } +
+    {
+      # When the gene score bar is hidden, keep +/- signs anchored to the
+      # bottom of the panel (next to the rug tick carpet), in neutral black.
+      if (!isTRUE(show_es_rank_bar)) {
+        list(
+          ggplot2::annotate(
+            geom = "text",
+            x = 1L,
+            y = -Inf,
+            label = "+",
+            hjust = 1.5,
+            vjust = -0.5,
+            size = 2.5,
+            fontface = "bold",
+            color = "black"
+          ),
+          ggplot2::annotate(
+            geom = "text",
+            x = max(running_data$index),
+            y = -Inf,
+            label = "-",
+            hjust = -0.5,
+            vjust = -0.5,
+            size = 2.5,
+            fontface = "bold",
+            color = "black"
+          )
+        )
+      }
+    } +
     ggplot2::theme_bw() +
     ggplot2::theme(
       panel.grid.minor = ggplot2::element_blank(),
@@ -1044,7 +1168,9 @@ gsea_vis_rank_plot <- function(
   running_data,
   leading_edge_genes,
   line_color,
-  rank_area_color = "grey",
+  rank_area_color = "red",
+  show_rnk_le_highlight = TRUE,
+  show_rnk_peak_line = TRUE,
   display_leading_edge_genes = FALSE,
   number_of_leading_edge_genes_to_display = 10,
   font_size_of_leading_edge_genes = 3
@@ -1070,26 +1196,14 @@ gsea_vis_rank_plot <- function(
     score_span <- 1
   }
   color_margin <- line_color
-  # Text annotations always use black (neutral) so the LE count label
-  # is readable regardless of curve color mode.
-  annotation_color <- "black"
-  le_count <- sum(ranks$leading_edge, na.rm = TRUE)
   leading_edge_indices <- which(ranks$leading_edge)
   le_xmin <- if (length(leading_edge_indices) > 0) min(leading_edge_indices) else NA_real_
   le_xmax <- if (length(leading_edge_indices) > 0) max(leading_edge_indices) else NA_real_
-  le_ticks <- ranks[ranks$leading_edge & is.finite(ranks$score), c("index", "score"), drop = FALSE]
-  le_text_x <- nrow(ranks) / 2
-  le_text_hjust <- 0.5
-  le_text_y <- score_range[[1]] + 0.12 * score_span
-  le_label <- paste(le_count, "genes in the Leading Edge")
-  if (!is.na(nes) && nes < 0) {
-    le_text_y <- score_range[[2]] - 0.12 * score_span
-  }
   area_layers <- {
     # "red_blue": per-gene gradient fill (red→white→blue by score value),
     #   identical palette to the ES strip rug — fully independent of line_color.
     # "grey"    : smooth grey area (default).
-    if (identical(as.character(rank_area_color %||% "grey"), "red_blue")) {
+    if (grepl("^red", as.character(rank_area_color %||% "grey"), ignore.case = TRUE)) {
       margins_rnk  <- gsea_vis_color_margins()
       clip_rnk     <- stats::quantile(abs(ranks$score), 0.95, na.rm = TRUE)
       if (!is.finite(clip_rnk) || clip_rnk == 0) clip_rnk <- max(abs(ranks$score), na.rm = TRUE)
@@ -1118,7 +1232,7 @@ gsea_vis_rank_plot <- function(
   plot <- ggplot2::ggplot(ranks, ggplot2::aes(x = index, y = display_score)) +
     area_layers +
     {
-      if (is.finite(le_xmin) && is.finite(le_xmax)) {
+      if (isTRUE(show_rnk_le_highlight) && is.finite(le_xmin) && is.finite(le_xmax)) {
         ggplot2::annotate(
           geom = "rect",
           xmin = le_xmin,
@@ -1131,16 +1245,7 @@ gsea_vis_rank_plot <- function(
       }
     } +
     ggplot2::scale_y_continuous(limits = score_range) +
-    ggplot2::labs(x = "Gene Rank", y = "Gene Score") +
-    ggplot2::annotate(
-      geom = "text",
-      x = le_text_x,
-      y = le_text_y,
-      label = le_label,
-      color = annotation_color,
-      hjust = le_text_hjust,
-      size = 2.9
-    )
+    ggplot2::labs(x = "Gene Rank", y = "Gene Score")
 
   plot <- plot +
     ggplot2::theme_bw() +
@@ -1162,6 +1267,20 @@ gsea_vis_rank_plot <- function(
     plot <- plot + ggplot2::scale_x_continuous(position = "bottom", limits = c(0, nrow(ranks)))
   }
 
+  if (isTRUE(show_rnk_peak_line)) {
+    max_row_rnk <- running_data[running_data$max_deviation, , drop = FALSE]
+    if (nrow(max_row_rnk) > 0) {
+      plot <- plot + ggplot2::geom_vline(
+        data = max_row_rnk,
+        ggplot2::aes(xintercept = index),
+        inherit.aes = FALSE,
+        linetype = "dashed",
+        linewidth = 0.3,
+        color = "#555555"
+      )
+    }
+  }
+
   plot
 }
 
@@ -1172,8 +1291,12 @@ gsea_vis_pathway_plot <- function(
   expression_data = NULL,
   plots_to_include = "ES+RNK",
   running_score_line_color = "ES sign",
-  add_max_deviation_line = "coordinate",
-  rank_area_color = "grey",
+  add_max_deviation_line = "both",
+  show_es_rank_bar = FALSE,
+  show_es_le_highlight = TRUE,
+  rank_area_color = "red",
+  show_rnk_le_highlight = TRUE,
+  show_rnk_peak_line = TRUE,
   display_leading_edge_genes = FALSE,
   number_of_leading_edge_genes_to_display = 10,
   font_size_of_leading_edge_genes = 3,
@@ -1184,14 +1307,16 @@ gsea_vis_pathway_plot <- function(
   show_le_heatmap_sample_names = FALSE,
   show_le_heatmap_gene_names = TRUE,
   show_le_heatmap_rank_labels = TRUE,
-  order_le_heatmap_rows_by_rank = TRUE
+  order_le_heatmap_rows_by_rank = TRUE,
+  pdf_height = 6.5,
+  pdf_width  = 8.5
 ) {
   if (!requireNamespace("patchwork", quietly = TRUE)) {
     stop("GSEA-Vis requires the patchwork package for ES+RNK plots.", call. = FALSE)
   }
 
   plots_to_include <- as.character(plots_to_include %||% "ES+RNK")
-  plots_to_include <- if (plots_to_include %in% c("ES", "ES+RNK", "ES+RNK+LE", "LE")) {
+  plots_to_include <- if (plots_to_include %in% c("ES", "ES+RNK", "ES+LE", "ES+RNK+LE", "LE")) {
     plots_to_include
   } else {
     "ES+RNK+LE"
@@ -1199,7 +1324,15 @@ gsea_vis_pathway_plot <- function(
   line_color <- gsea_vis_plot_color(row, running_score_line_color)
   running_data <- gsea_vis_running_es_data(stats, genes)
   leading_edge_genes <- gsea_vis_row_leading_edge_genes(row, stats, running_data)
-  include_es <- grepl("ES", plots_to_include, fixed = TRUE)
+  # Compute LE count (NES-sign filtered) for the ES panel title
+  nes_val_pe <- suppressWarnings(as.numeric(row$NES))
+  le_in_data  <- intersect(leading_edge_genes, running_data$gene)
+  le_count_title <- if (!is.na(nes_val_pe) && nes_val_pe < 0) {
+    sum(running_data$gene %in% le_in_data & running_data$score < 0)
+  } else {
+    sum(running_data$gene %in% le_in_data & running_data$score > 0)
+  }
+  include_es  <- grepl("ES",  plots_to_include, fixed = TRUE)
   include_rnk <- grepl("RNK", plots_to_include, fixed = TRUE)
   include_le <- grepl("LE", plots_to_include, fixed = TRUE)
 
@@ -1210,7 +1343,11 @@ gsea_vis_pathway_plot <- function(
       running_data,
       line_color = line_color,
       add_max_deviation_line = add_max_deviation_line,
-      show_x_label = !include_rnk   # label appears only when ES is the bottom panel
+      show_es_rank_bar = show_es_rank_bar,
+      show_es_le_highlight = show_es_le_highlight,
+      leading_edge_genes = leading_edge_genes,
+      le_count = le_count_title,
+      show_x_label = !include_rnk
     )
   }
 
@@ -1221,6 +1358,8 @@ gsea_vis_pathway_plot <- function(
       leading_edge_genes = leading_edge_genes,
       line_color = line_color,
       rank_area_color = rank_area_color,
+      show_rnk_le_highlight = show_rnk_le_highlight,
+      show_rnk_peak_line = show_rnk_peak_line,
       display_leading_edge_genes = display_leading_edge_genes,
       number_of_leading_edge_genes_to_display = number_of_leading_edge_genes_to_display,
       font_size_of_leading_edge_genes = font_size_of_leading_edge_genes
@@ -1240,7 +1379,9 @@ gsea_vis_pathway_plot <- function(
       show_le_heatmap_sample_names = show_le_heatmap_sample_names,
       show_le_heatmap_gene_names = show_le_heatmap_gene_names,
       show_le_heatmap_rank_labels = show_le_heatmap_rank_labels,
-      order_le_heatmap_rows_by_rank = order_le_heatmap_rows_by_rank
+      order_le_heatmap_rows_by_rank = order_le_heatmap_rows_by_rank,
+      pdf_height = pdf_height,
+      pdf_width  = pdf_width
     )
   }
 
@@ -1299,15 +1440,20 @@ GSEA_Visualization_Local <- function(
   plot_contrasts = character(0),
   plot_all_pathways = FALSE,
   top_n_pathways = 1,
+  top_n_by_sign = FALSE,
   preview_contrast = "",
   preview_contrasts = character(0),
   max_plots_in_pdf = 50,
   stop_if_too_many_plots = TRUE,
   plots_to_include = "ES+RNK+LE",
   running_score_line_color = "ES sign",
-  add_max_deviation_line = "coordinate",
+  add_max_deviation_line = "both",
   rank_plot_mode = NULL,
-  rank_area_color = "grey",
+  show_es_rank_bar = FALSE,
+  show_es_le_highlight = TRUE,
+  rank_area_color = "red",
+  show_rnk_le_highlight = TRUE,
+  show_rnk_peak_line = TRUE,
   display_leading_edge_genes = FALSE,
   number_of_leading_edge_genes_to_display = 10,
   font_size_of_leading_edge_genes = 3,
@@ -1343,7 +1489,8 @@ GSEA_Visualization_Local <- function(
     gsea_table,
     plot_contrasts = plot_contrasts,
     plot_all_pathways = isTRUE(plot_all_pathways),
-    top_n_pathways = top_n_pathways
+    top_n_pathways = top_n_pathways,
+    top_n_by_sign = isTRUE(top_n_by_sign)
   )
   if (nrow(selected) == 0) {
     return(list(
@@ -1444,7 +1591,11 @@ GSEA_Visualization_Local <- function(
       plots_to_include = plots_to_include,
       running_score_line_color = running_score_line_color,
       add_max_deviation_line = add_max_deviation_line,
+      show_es_rank_bar = isTRUE(show_es_rank_bar),
+      show_es_le_highlight = isTRUE(show_es_le_highlight),
       rank_area_color = rank_area_color,
+      show_rnk_le_highlight = isTRUE(show_rnk_le_highlight),
+      show_rnk_peak_line = isTRUE(show_rnk_peak_line),
       display_leading_edge_genes = isTRUE(display_leading_edge_genes),
       number_of_leading_edge_genes_to_display = number_of_leading_edge_genes_to_display,
       font_size_of_leading_edge_genes = font_size_of_leading_edge_genes,
@@ -1455,7 +1606,9 @@ GSEA_Visualization_Local <- function(
       show_le_heatmap_sample_names = gsea_vis_bool(show_le_heatmap_sample_names, FALSE),
       show_le_heatmap_gene_names = gsea_vis_bool(show_le_heatmap_gene_names, TRUE),
       show_le_heatmap_rank_labels = gsea_vis_bool(show_le_heatmap_rank_labels, TRUE),
-      order_le_heatmap_rows_by_rank = gsea_vis_bool(order_le_heatmap_rows_by_rank, TRUE)
+      order_le_heatmap_rows_by_rank = gsea_vis_bool(order_le_heatmap_rows_by_rank, TRUE),
+      pdf_height = as.numeric(pdf_height),
+      pdf_width  = as.numeric(pdf_width)
     )
     print(plot)
 
@@ -1511,7 +1664,11 @@ GSEA_Visualization_Local <- function(
       plots_to_include = plots_to_include,
       running_score_line_color = running_score_line_color,
       add_max_deviation_line = add_max_deviation_line,
+      show_es_rank_bar = isTRUE(show_es_rank_bar),
+      show_es_le_highlight = isTRUE(show_es_le_highlight),
       rank_area_color = rank_area_color,
+      show_rnk_le_highlight = isTRUE(show_rnk_le_highlight),
+      show_rnk_peak_line = isTRUE(show_rnk_peak_line),
       display_leading_edge_genes = isTRUE(display_leading_edge_genes),
       number_of_leading_edge_genes_to_display = number_of_leading_edge_genes_to_display,
       font_size_of_leading_edge_genes = font_size_of_leading_edge_genes,
@@ -1522,7 +1679,9 @@ GSEA_Visualization_Local <- function(
       show_le_heatmap_sample_names = gsea_vis_bool(show_le_heatmap_sample_names, FALSE),
       show_le_heatmap_gene_names = gsea_vis_bool(show_le_heatmap_gene_names, TRUE),
       show_le_heatmap_rank_labels = gsea_vis_bool(show_le_heatmap_rank_labels, TRUE),
-      order_le_heatmap_rows_by_rank = gsea_vis_bool(order_le_heatmap_rows_by_rank, TRUE)
+      order_le_heatmap_rows_by_rank = gsea_vis_bool(order_le_heatmap_rows_by_rank, TRUE),
+      pdf_height = as.numeric(pdf_height),
+      pdf_width  = as.numeric(pdf_width)
     )
     ggplot2::ggsave(
       preview_file,
