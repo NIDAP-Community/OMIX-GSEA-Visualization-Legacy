@@ -1744,28 +1744,28 @@ GSEA_Visualization_Local <- function(
       skipped_file,
       row.names = FALSE
     )
-  }
+  }#
 
   list(
-    manifest = manifest,
+    #manifest = manifest,
     running_es = running_es,
     plots = list(
-      preview = if (file.exists(preview_file)) normalizePath(preview_file, winslash = "/", mustWork = FALSE) else NULL,
-      previews = lapply(preview_files, function(path) normalizePath(path, winslash = "/", mustWork = FALSE)),
+      #preview = if (file.exists(preview_file)) normalizePath(preview_file, winslash = "/", mustWork = FALSE) else NULL,
+      #previews = lapply(preview_files, function(path) normalizePath(path, winslash = "/", mustWork = FALSE)),
       pdf = if (file.exists(pdf_file)) normalizePath(pdf_file, winslash = "/", mustWork = FALSE) else NULL
     ),
     files = list(
-      preview = if (file.exists(preview_file)) normalizePath(preview_file, winslash = "/", mustWork = FALSE) else NULL,
-      previews = lapply(preview_files, function(path) normalizePath(path, winslash = "/", mustWork = FALSE)),
+      #preview = if (file.exists(preview_file)) normalizePath(preview_file, winslash = "/", mustWork = FALSE) else NULL,
+      #previews = lapply(preview_files, function(path) normalizePath(path, winslash = "/", mustWork = FALSE)),
       pdf = if (file.exists(pdf_file)) normalizePath(pdf_file, winslash = "/", mustWork = FALSE) else NULL,
-      manifest = normalizePath(manifest_file, winslash = "/", mustWork = FALSE),
+      #manifest = normalizePath(manifest_file, winslash = "/", mustWork = FALSE),
       running_es = normalizePath(running_es_file, winslash = "/", mustWork = FALSE),
       skipped = if (!is.null(skipped_file)) normalizePath(skipped_file, winslash = "/", mustWork = FALSE) else NULL
     ),
     skipped = unlist(skipped, use.names = FALSE),
     message = paste0(
       "GSEA-Vis complete: generated ",
-      nrow(manifest),
+      #nrow(manifest),
       " ",
       as.character(plots_to_include %||% "ES+RNK"),
       " plot(s)",
