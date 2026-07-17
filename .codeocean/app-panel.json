@@ -445,11 +445,6 @@
 			"file_name": "GSEA-Vis-RunningES.csv",
 			"title": "Running Enrichment Scores (CSV)",
 			"description": "Running enrichment score data for all plots (CSV)"
-		},
-		{
-			"file_name": "GSEA-Vis-RunningES.rds",
-			"title": "Running Enrichment Scores (RDS)",
-			"description": "Running enrichment score data for all plots (RDS)"
 		}
 	]
 }
