@@ -17,13 +17,13 @@ script_dir <- if (length(script_file_arg) > 0) {
   getwd()
 }
 core_candidates <- c(
-  file.path(script_dir, "GSEA_Visualization_Local_v1.R"),
-  "/code/GSEA_Visualization_Local_v1.R"
+  file.path(script_dir, "gsea_enrichment_plot.R"),
+  "/code/gsea_enrichment_plot.R"
 )
 core_file <- core_candidates[file.exists(core_candidates)][1]
 if (is.na(core_file)) {
   stop(
-    "ERROR: GSEA_Visualization_Local_v1.R was not found beside the CLI script or under /code.",
+    "ERROR: gsea_enrichment_plot.R was not found beside the CLI script or under /code.",
     call. = FALSE
   )
 }

@@ -5,4 +5,4 @@ set -euo pipefail
 # Forwards all named parameters from App Panel to R script
 
 # Pass all arguments directly to the R script
-exec Rscript /code/run_gsea_visualization.R "$@"
+exec Rscript /code/main.R "$@"

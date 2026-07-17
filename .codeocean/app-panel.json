@@ -351,11 +351,11 @@
 			"maximum": 200
 		},
 		{
-			"id": "vRDDQG1HLjtqa914",
+			"id": "UKqayWM5faJmfqog-hm",
 			"category": "heatmap",
-			"name": "Cluster LE heatmap rows",
-			"param_name": "cluster_le_heatmap_rows",
-			"help_text": "Apply hierarchical clustering to heatmap rows (genes).",
+			"name": "Show LE heatmap gene names",
+			"param_name": "show_le_heatmap_gene_names",
+			"help_text": "Display gene symbols on heatmap rows.",
 			"type": "list",
 			"value_type": "string",
 			"default_value": "TRUE",
@@ -365,25 +365,11 @@
 			]
 		},
 		{
-			"id": "clusterHmCols",
+			"id": "showRankLabels",
 			"category": "heatmap",
-			"name": "Cluster LE heatmap columns",
-			"param_name": "cluster_le_heatmap_columns",
-			"help_text": "Apply hierarchical clustering to heatmap columns (samples).",
-			"type": "list",
-			"value_type": "string",
-			"default_value": "FALSE",
-			"extra_data": [
-				"FALSE",
-				"TRUE"
-			]
-		},
-		{
-			"id": "UKqayWM5faJmfqog-hm",
-			"category": "heatmap",
-			"name": "Show LE heatmap gene names",
-			"param_name": "show_le_heatmap_gene_names",
-			"help_text": "Display gene symbols on heatmap rows.",
+			"name": "Show leading-edge gene order",
+			"param_name": "show_le_heatmap_rank_labels",
+			"help_text": "When enabled, a number is added before each heatmap gene name, for example **1. MYC** and **2. JUN**. The numbering reflects order within that pathway’s leading-edge subset: 1 is the strongest positively scored gene for an upregulated pathway or the strongest negatively scored gene for a downregulated pathway. This is separate from the gene’s position in the full GSEA ranked list.",
 			"type": "list",
 			"value_type": "string",
 			"default_value": "TRUE",
@@ -407,31 +393,95 @@
 			]
 		},
 		{
-			"id": "showRankLabels",
+			"id": "jjlldyDRNPAfc2Du",
 			"category": "heatmap",
-			"name": "Prefix LE heatmap genes with LE# rank",
-			"param_name": "show_le_heatmap_rank_labels",
-			"help_text": "Adds within-leading-edge ranks to heatmap row labels, e.g. LE#1 Myc. Rank 1 is the strongest up or down leading-edge gene for that pathway.",
+			"name": "LE heatmap gene ordering",
+			"param_name": "heatmap_gene_order",
+			"help_text": "Choose how genes are ordered in the heatmap: **rank** orders genes by leading-edge rank, **cluster** applies hierarchical clustering, and **input** preserves the original gene order. Gene clustering distance and method are used only with `cluster`.",
 			"type": "list",
 			"value_type": "string",
-			"default_value": "TRUE",
+			"default_value": "rank",
 			"extra_data": [
-				"TRUE",
-				"FALSE"
+				"rank",
+				"cluster",
+				"input"
 			]
 		},
 		{
-			"id": "orderByRank",
+			"id": "e8PUHAyiP2inO4lQ",
 			"category": "heatmap",
-			"name": "Order LE heatmap rows by LE# rank",
-			"param_name": "order_le_heatmap_rows_by_rank",
-			"help_text": "Shows strongest leading-edge genes first. When enabled, row clustering is disabled so rank order is preserved.",
+			"name": "LE heatmap sample ordering",
+			"param_name": "heatmap_sample_order",
+			"help_text": "Choose how samples are ordered in the heatmap: **group** orders samples by the selected metadata group, **cluster** applies hierarchical clustering, and **input** preserves the sample order from the expression matrix. Sample clustering distance and method are used only with `cluster`.",
 			"type": "list",
 			"value_type": "string",
-			"default_value": "TRUE",
+			"default_value": "group",
 			"extra_data": [
-				"TRUE",
-				"FALSE"
+				"group",
+				"cluster",
+				"input"
+			]
+		},
+		{
+			"id": "9hmO2i2u8U3zR2IS",
+			"category": "heatmap",
+			"name": "Gene clustering distance",
+			"param_name": "heatmap_gene_clustering_distance",
+			"help_text": "Choose the distance measure for gene clustering: **euclidean**, **manhattan**, **pearson**, and **spearman**. This setting is used only when gene ordering is `cluster`.",
+			"type": "list",
+			"value_type": "string",
+			"default_value": "euclidean",
+			"extra_data": [
+				"euclidean",
+				"manhattan",
+				"pearson",
+				"spearman"
+			]
+		},
+		{
+			"id": "qDM23siTXEB8pOJu",
+			"category": "heatmap",
+			"name": "Sample clustering distance",
+			"param_name": "heatmap_sample_clustering_distance",
+			"help_text": "Choose the distance measure for sample clustering: **euclidean**, **manhattan**, **pearson**, and **spearman**. This setting is used only when sample ordering is `cluster`.",
+			"type": "list",
+			"value_type": "string",
+			"default_value": "euclidean",
+			"extra_data": [
+				"euclidean",
+				"manhattan",
+				"pearson",
+				"spearman"
+			]
+		},
+		{
+			"id": "VnLb3SZwpAIQAgOR",
+			"category": "heatmap",
+			"name": "Gene clustering method",
+			"param_name": "heatmap_gene_clustering_method",
+			"help_text": "Choose the linkage method for gene clustering: **complete**, **average**, and **ward.D2**. This setting is used only when ordering is `cluster`. Use `ward.D2` with `euclidean` distance to preserve the standard Ward minimum-variance interpretation.",
+			"type": "list",
+			"value_type": "string",
+			"default_value": "complete",
+			"extra_data": [
+				"complete",
+				"average",
+				"ward.D2"
+			]
+		},
+		{
+			"id": "t1SEO1KpfxPNUZra",
+			"category": "heatmap",
+			"name": "Sample clustering method",
+			"param_name": "heatmap_sample_clustering_method",
+			"help_text": "Choose the linkage method for sample clustering: **complete**, **average**, and **ward.D2**. This setting is used only when ordering is `cluster`. Use `ward.D2` with `euclidean` distance to preserve the standard Ward minimum-variance interpretation.",
+			"type": "list",
+			"value_type": "string",
+			"default_value": "complete",
+			"extra_data": [
+				"complete",
+				"average",
+				"ward.D2"
 			]
 		}
 	],
@@ -440,11 +490,6 @@
 			"file_name": "GSEA-Vis-Enrichment-Plots.pdf",
 			"title": "All Enrichment Plots",
 			"description": "Multi-page PDF of all enrichment plots"
-		},
-		{
-			"file_name": "GSEA-Vis-RunningES.csv",
-			"title": "Running Enrichment Scores (CSV)",
-			"description": "Running enrichment score data for all plots (CSV)"
 		}
 	]
 }
