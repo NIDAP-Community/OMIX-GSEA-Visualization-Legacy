@@ -490,6 +490,9 @@
 			"file_name": "GSEA-Vis-Enrichment-Plots.pdf",
 			"title": "All Enrichment Plots",
 			"description": "Multi-page PDF of all enrichment plots"
+		},
+		{
+			"file_name": "GSEA-Vis-RunningES.csv"
 		}
 	]
 }
