@@ -2066,9 +2066,9 @@ GSEA_Visualization_Local <- function(
   # A strict majority of failed pathways indicates a systemic input mismatch.
   # Write the diagnostics first so the cause remains auditable in /results.
   if (failed_count > selected_count / 2) {
-    utils::write.csv(consistency_table, consistency_file, row.names = FALSE)
+    #utils::write.csv(consistency_table, consistency_file, row.names = FALSE)
     failed_table <- consistency_table[failed_validation, , drop = FALSE]
-    utils::write.csv(failed_table, skipped_file, row.names = FALSE)
+    #utils::write.csv(failed_table, skipped_file, row.names = FALSE)
     stop(
       sprintf(
         paste0(
@@ -2247,12 +2247,12 @@ GSEA_Visualization_Local <- function(
   running_es_connection <- NULL
 
   consistency_table <- do.call(rbind, diagnostic_rows)
-  utils::write.csv(consistency_table, consistency_file, row.names = FALSE)
+  #utils::write.csv(consistency_table, consistency_file, row.names = FALSE)
 
   failed_table <- consistency_table[grepl("^failed_", consistency_table$consistency_level), , drop = FALSE]
   skipped_file_out <- NULL
   if (nrow(failed_table) > 0) {
-    utils::write.csv(failed_table, skipped_file, row.names = FALSE)
+    #utils::write.csv(failed_table, skipped_file, row.names = FALSE)
     skipped_file_out <- skipped_file
   }
 
