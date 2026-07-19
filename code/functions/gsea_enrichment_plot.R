@@ -552,6 +552,32 @@ gsea_vis_reconstructed_leading_edge_genes <- function(running_data) {
   running_data$gene[running_data$in_pathway & running_data$index <= peak_index]
 }
 
+# Return the display-region boundary implied by the reconstructed running-ES
+# curve. This is intentionally separate from authoritative leading-edge gene
+# membership, which remains sourced from the upstream GSEA result.
+gsea_vis_displayed_leading_edge_bounds <- function(running_data) {
+  if (!is.data.frame(running_data) || nrow(running_data) == 0L) {
+    return(c(xmin = NA_real_, xmax = NA_real_))
+  }
+
+  peak_rows <- which(running_data$max_deviation)
+  if (length(peak_rows) == 0L) {
+    return(c(xmin = NA_real_, xmax = NA_real_))
+  }
+
+  peak_index <- peak_rows[[1L]]
+  peak_es <- suppressWarnings(as.numeric(running_data$running_es[[peak_index]]))
+  if (!is.finite(peak_es)) {
+    return(c(xmin = NA_real_, xmax = NA_real_))
+  }
+
+  if (peak_es < 0) {
+    return(c(xmin = peak_index, xmax = max(running_data$index)))
+  }
+
+  c(xmin = min(running_data$index), xmax = peak_index)
+}
+
 gsea_vis_row_leading_edge_genes <- function(row, stats, running_data = NULL) {
   membership <- gsea_vis_authoritative_membership(row, stats)
   if (!isTRUE(membership$valid)) {
@@ -1215,13 +1241,12 @@ gsea_vis_es_plot <- function(
   margins <- gsea_vis_color_margins()
   strip_y <- es_range[[1]] - (0.08 * es_span)
 
-  # Compute the optional ES highlight from the same leading-edge vector used
-  # by the RNK panel, heatmap, and Running ES export.
-  le_genes_es <- intersect(leading_edge_genes, running_data$gene)
-  le_flags_es <- running_data$gene %in% le_genes_es
-  le_idx_es  <- which(le_flags_es)
-  le_xmin_es <- if (length(le_idx_es) > 0) min(le_idx_es) else NA_real_
-  le_xmax_es <- if (length(le_idx_es) > 0) max(le_idx_es) else NA_real_
+  # Align the display highlight with the peak/trough of the reconstructed
+  # running-ES curve. Authoritative leading-edge membership is unchanged and
+  # is still used for counts, heatmaps, exports, and diagnostics.
+  highlight_bounds <- gsea_vis_displayed_leading_edge_bounds(running_data)
+  le_xmin_es <- unname(highlight_bounds[["xmin"]])
+  le_xmax_es <- unname(highlight_bounds[["xmax"]])
 
   plot <- ggplot2::ggplot(running_data, ggplot2::aes(x = index, y = running_es)) +
     {
@@ -1433,9 +1458,11 @@ gsea_vis_rank_plot <- function(
     score_span <- 1
   }
   color_margin <- line_color
-  leading_edge_indices <- which(ranks$leading_edge)
-  le_xmin <- if (length(leading_edge_indices) > 0) min(leading_edge_indices) else NA_real_
-  le_xmax <- if (length(leading_edge_indices) > 0) max(leading_edge_indices) else NA_real_
+  # Use the same reconstructed-curve boundary as the ES panel so both shaded
+  # regions align with the displayed peak/trough and dashed guide line.
+  highlight_bounds <- gsea_vis_displayed_leading_edge_bounds(running_data)
+  le_xmin <- unname(highlight_bounds[["xmin"]])
+  le_xmax <- unname(highlight_bounds[["xmax"]])
   area_layers <- {
     # "red_blue": per-gene gradient fill (red→white→blue by score value),
     #   identical palette to the ES strip rug — fully independent of line_color.
@@ -1779,18 +1806,9 @@ gsea_vis_validate_pathway_consistency <- function(row, stats) {
   } else {
     NA_real_
   }
-  boundary_warning_message <- if (!isTRUE(leading_edge_boundary_agrees)) {
-    sprintf(
-      paste0(
-        "The authoritative GSEA Filter leadingEdge list differs from the subset implied by the reconstructed ES peak ",
-        "(%d of %d authoritative genes overlap). The GSEA Filter leadingEdge list will be used."
-      ),
-      sum(authoritative_leading_edge_genes %in% reconstructed_leading_edge_genes),
-      length(authoritative_leading_edge_genes)
-    )
-  } else {
-    NULL
-  }
+  # Retain boundary-comparison diagnostics in the consistency table, but do
+  # not emit a runtime warning for this expected legacy-ranking mismatch.
+  boundary_warning_message <- NULL
 
   list(
     valid = TRUE,
@@ -2074,9 +2092,6 @@ GSEA_Visualization_Local <- function(
     } else {
       if (identical(validation$membership$consistency_level, "leading_edge_strict")) {
         message("WARNING: ", pathway_label, " — ", validation$membership$warning_message)
-      }
-      if (!is.null(validation$boundary_warning_message)) {
-        message("WARNING: ", pathway_label, " — ", validation$boundary_warning_message)
       }
     }
   }
