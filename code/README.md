@@ -1,6 +1,6 @@
-# OMIX GSEA Enrichment Plot Legacy
+# OMIX GSEA Visualization Legacy
 
-Generates enrichment plots from GSEA Filter Legacy and GSEA Preranked Legacy results, including:
+Generates enrichment plots from OMIX GSEA Filters Legacy, including:
 - **ES (Enrichment Score)** plot with running score
 - **RNK (Rank)** plot showing gene rankings
 - **LE (Leading Edge)** heatmap with expression data
