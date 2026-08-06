@@ -1,5 +1,5 @@
 metadata_version: 1
-name: OMIX GSEA Enrichment Plot
+name: OMIX GSEA Enrichment Plot Legacy
 description: 'Generates visualizations and numerical estimates for Gene Set Enrichment
   Analysis (GSEA) specific to a gene set, that is:  enrichment running score (ES),
   rank statistic barplot (RNK), and the leading edge genes heatmap (LE).'
