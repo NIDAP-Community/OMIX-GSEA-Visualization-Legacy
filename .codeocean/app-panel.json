@@ -2,7 +2,7 @@
 	"version": 1,
 	"named_parameters": true,
 	"general": {
-		"title": "GSEA Enrichment Plot",
+		"title": "GSEA Visualization Legacy",
 		"instructions": "Generate enrichment plots from a GSEA results table and a DEG table.**Required inputs:**1. **GSEA Filter Results** — filtered pathway table (CSV or RDS from OMIX GSEA Filter)2. **DEG Table** — differential expression results (CSV or RDS)**Optional inputs for LE heatmaps:**3. **Normalized Expression** — expression matrix (CSV or RDS, genes × samples)4. **Sample Metadata** — annotations (CSV or RDS)**Column mapping:** Set the column name fields below if your files use names other than the defaults.Uploaded files always take priority over attached data assets."
 	},
 	"datasets": [
