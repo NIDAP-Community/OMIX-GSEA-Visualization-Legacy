@@ -107,14 +107,12 @@ gsea_cli_choice <- function(value, choices, default, parameter) {
 #' Parse command-line arguments
 get_args <- function() {
   option_list <- list(
+    make_option(c("--msigdb_database"), type = "character", default = NULL,
+                help = "Path to an MSigDB database (.rds or .csv). Used to restore pathway membership when it is absent from filtered GSEA results."),
     make_option(c("--gsea_filter_results"), type = "character", default = NULL,
                 help = "Path to GSEA Filter results file (CSV or RDS flat table)"),
-    make_option(c("--deg_table"), type = "character", default = NULL,
-                help = "Path to DEG table (CSV or RDS with gene, ranking stat, and optionally contrast columns)"),
-    make_option(c("--normalized_expression"), type = "character", default = NULL,
-                help = "Path to normalized expression matrix (CSV or RDS, genes x samples) [required for LE heatmaps]"),
-    make_option(c("--sample_metadata"), type = "character", default = NULL,
-                help = "Path to sample metadata file (CSV or RDS with sample grouping) [required for LE heatmaps]"),
+    make_option(c("--deg_analysis_results"), type = "character", default = NULL,
+                help = "Directory containing the OMIX DEG Analysis result bundle (DEG_Analysis.csv and Sample_Metadata.csv)"),
     make_option(c("--contrast_filter"), type = "character", default = "none",
                 help = "Contrast filter mode: none / keep / remove [default: none]"),
     make_option(c("--contrasts"), type = "character", default = "",
@@ -163,8 +161,8 @@ get_args <- function() {
                 help = "Show sample names in heatmap [default: FALSE]"),
     make_option(c("--show_le_heatmap_rank_labels"), type = "logical", default = TRUE,
                 help = "Prefix heatmap gene labels with compact leading-edge ranks, e.g. 1. MYC [default: TRUE]"),
-    make_option(c("--heatmap_gene_names_column"), type = "character", default = "gene",
-                help = "Gene column name in expression table [default: gene]"),
+    make_option(c("--heatmap_gene_names_column"), type = "character", default = "GeneName",
+                help = "Gene column name in expression table [default: GeneName]"),
     make_option(c("--heatmap_sample_names_column"), type = "character", default = "Sample",
                 help = "Sample column name in metadata [default: Sample]"),
     make_option(c("--heatmap_group_column"), type = "character", default = "Group",
@@ -278,11 +276,11 @@ read_gsea_filter <- function(path) {
   data
 }
 
-#' Read normalized expression without assuming the first column is row names
+#' Read DEG Analysis sample-level expression without assuming the first column is row names
 read_expression_table <- function(path) {
   data <- read_tabular_input(
     path,
-    "normalized expression",
+    "DEG Analysis sample-level expression",
     function(csv_path) {
       utils::read.csv(csv_path, check.names = FALSE, stringsAsFactors = FALSE)
     }
@@ -352,60 +350,236 @@ construct_batch_result <- function(expression_path, metadata_path) {
   )
 }
 
-#' Find the GSEA Filter flat table in its default data-asset mount folder
+#' List matching files below a data root.
 #'
-#' Prefer the RDS export when both standard RDS and CSV files are present.
-#' Explicit App Panel uploads still take priority before this helper is called.
-find_gsea_filter_file <- function(mount_dir) {
-  rds_file <- file.path(mount_dir, "filtered_gsea_results.rds")
-  csv_file <- file.path(mount_dir, "filtered_gsea_results.csv")
-
-  if (file.exists(rds_file)) {
-    if (file.exists(csv_file)) {
-      cat(sprintf(
-        "  Both RDS and CSV GSEA Filter results were found; using RDS: %s\n",
-        rds_file
-      ))
-    }
-    return(rds_file)
+#' Workflow-connected Results are mounted in a generated subdirectory of
+#' /data, so recursive discovery is required rather than hard-coded mounts.
+find_data_files <- function(data_root = "/data", pattern) {
+  if (!dir.exists(data_root)) {
+    return(character(0))
   }
-
-  if (file.exists(csv_file)) {
-    return(csv_file)
-  }
-
-  NULL
+  sort(list.files(
+    data_root,
+    pattern = pattern,
+    ignore.case = TRUE,
+    full.names = TRUE,
+    recursive = TRUE
+  ))
 }
 
-#' Find one CSV or RDS input in a data-asset mount folder
-find_single_file <- function(mount_dir, description) {
-  if (!dir.exists(mount_dir)) {
+#' Require exactly one matching input file.
+find_unique_data_file <- function(label, pattern, data_root = "/data") {
+  candidates <- find_data_files(data_root = data_root, pattern = pattern)
+  if (length(candidates) == 0L) {
     return(NULL)
   }
-
-  candidates <- sort(c(
-    list.files(mount_dir, pattern = "\\.rds$", ignore.case = TRUE, full.names = TRUE),
-    list.files(mount_dir, pattern = "\\.csv$", ignore.case = TRUE, full.names = TRUE)
-  ))
-  if (length(candidates) > 1) {
+  if (length(candidates) > 1L) {
     stop(
       sprintf(
-        "ERROR: Multiple %s files were found under %s. Upload or attach exactly one file: %s",
-        description,
-        mount_dir,
-        paste(basename(candidates), collapse = ", ")
+        "ERROR: Multiple %s files were found below %s. Attach exactly one matching input: %s",
+        label,
+        data_root,
+        paste(candidates, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+  candidates[[1]]
+}
+
+#' Resolve the filtered GSEA result.  CSV is preferred for the portable
+#' workflow contract; RDS remains accepted for historical local runs.
+find_gsea_filter_file <- function(data_root = "/data") {
+  csv_file <- find_unique_data_file(
+    label = "filtered GSEA results CSV",
+    pattern = "^filtered_gsea_results\\.csv$",
+    data_root = data_root
+  )
+  if (!is.null(csv_file)) {
+    return(csv_file)
+  }
+  find_unique_data_file(
+    label = "filtered GSEA results RDS",
+    pattern = "^filtered_gsea_results\\.rds$",
+    data_root = data_root
+  )
+}
+
+#' Resolve one MSigDB database supplied as its own workflow input.
+find_msigdb_file <- function(data_root = "/data") {
+  find_unique_data_file(
+    label = "MSigDB database",
+    pattern = "msigdb.*\\.(rds|csv)$",
+    data_root = data_root
+  )
+}
+
+#' Locate the two interoperable files in one OMIX DEG Analysis result bundle.
+#'
+#' The bundle can also include diagnostics and run_summary.txt; those are
+#' intentionally ignored.  Only the two portable handoff tables are used.
+find_deg_analysis_bundle <- function(data_root = "/data") {
+  deg_tables <- find_data_files(
+    data_root = data_root,
+    pattern = "^DEG_Analysis\\.csv$"
+  )
+  metadata_tables <- find_data_files(
+    data_root = data_root,
+    pattern = "^Sample_Metadata\\.csv$"
+  )
+
+  if (length(deg_tables) == 0L || length(metadata_tables) == 0L) {
+    missing <- c(
+      if (length(deg_tables) == 0L) "DEG_Analysis.csv",
+      if (length(metadata_tables) == 0L) "Sample_Metadata.csv"
+    )
+    stop(
+      paste0(
+        "ERROR: The DEG Analysis input bundle must contain ",
+        paste(missing, collapse = " and "),
+        ". Attach one OMIX DEG Analysis Result with both files together."
       ),
       call. = FALSE
     )
   }
 
-  if (length(candidates) == 1) candidates[[1]] else NULL
+  deg_dirs <- dirname(deg_tables)
+  metadata_dirs <- dirname(metadata_tables)
+  bundle_dirs <- intersect(deg_dirs, metadata_dirs)
+  if (length(bundle_dirs) == 0L) {
+    stop(
+      paste0(
+        "ERROR: DEG_Analysis.csv and Sample_Metadata.csv were found, but not in the same result bundle. ",
+        "Attach one combined OMIX DEG Analysis Result."
+      ),
+      call. = FALSE
+    )
+  }
+  if (length(bundle_dirs) > 1L) {
+    stop(
+      sprintf(
+        "ERROR: Multiple OMIX DEG Analysis result bundles were found below %s: %s",
+        data_root,
+        paste(bundle_dirs, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+
+  bundle_dir <- bundle_dirs[[1]]
+  list(
+    directory = bundle_dir,
+    deg_table = deg_tables[match(bundle_dir, deg_dirs)],
+    sample_metadata = metadata_tables[match(bundle_dir, metadata_dirs)]
+  )
+}
+
+#' Read and validate the portable five-column MSigDB database table.
+read_msigdb_database <- function(path) {
+  database <- read_tabular_input(
+    path,
+    "MSigDB database",
+    function(csv_path) {
+      utils::read.csv(csv_path, check.names = FALSE, stringsAsFactors = FALSE)
+    }
+  )
+  required <- c("collection", "gene_set_name", "gene_symbol")
+  missing <- setdiff(required, names(database))
+  if (length(missing) > 0L) {
+    stop(
+      sprintf(
+        "ERROR: MSigDB database is missing required column(s): %s",
+        paste(missing, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+  database
+}
+
+#' Return TRUE when a GSEA row already carries a usable pathway-membership list.
+has_pathway_membership <- function(row) {
+  fields <- intersect(c("inPathway_orthologs", "inPathway"), names(row))
+  any(vapply(fields, function(field) {
+    length(gsea_vis_gene_vector(row[[field]])) > 0L
+  }, logical(1)))
+}
+
+#' Restore absent memberships from the attached MSigDB database.
+#'
+#' GSEA Filter normally carries inPathway already.  Keeping it intact retains
+#' analysis provenance and avoids loading the 5M-row bundled database unless
+#' the original legacy fallback is actually needed.
+restore_msigdb_membership <- function(gsea_rows, msigdb_path) {
+  missing_membership <- !vapply(
+    seq_len(nrow(gsea_rows)),
+    function(index) has_pathway_membership(gsea_rows[index, , drop = FALSE]),
+    logical(1)
+  )
+  if (!any(missing_membership)) {
+    cat("  MSigDB database: attached (embedded pathway membership already present)\n")
+    return(gsea_rows)
+  }
+
+  database <- read_msigdb_database(msigdb_path)
+  selected_rows <- which(missing_membership)
+  selected_collections <- unique(as.character(gsea_rows$collection[selected_rows]))
+  selected_pathways <- unique(as.character(gsea_rows$pathway[selected_rows]))
+  database <- database[
+    as.character(database$collection) %in% selected_collections &
+      as.character(database$gene_set_name) %in% selected_pathways,
+    , drop = FALSE
+  ]
+  if (nrow(database) == 0L) {
+    stop(
+      "ERROR: The supplied MSigDB database has no records for the selected filtered GSEA pathways.",
+      call. = FALSE
+    )
+  }
+
+  matches_value <- function(values, target) {
+    tolower(trimws(as.character(values))) == tolower(trimws(as.character(target)))
+  }
+  if (!"inPathway" %in% names(gsea_rows)) {
+    gsea_rows$inPathway <- NA_character_
+  }
+  for (index in selected_rows) {
+    row <- gsea_rows[index, , drop = FALSE]
+    candidates <- database[
+      matches_value(database$collection, row$collection[[1]]) &
+        matches_value(database$gene_set_name, row$pathway[[1]]),
+      , drop = FALSE
+    ]
+    if ("pathways_database" %in% names(row) && "pathways_database" %in% names(candidates) &&
+        !is.na(row$pathways_database[[1]]) && nzchar(as.character(row$pathways_database[[1]]))) {
+      candidates <- candidates[matches_value(candidates$pathways_database, row$pathways_database[[1]]), , drop = FALSE]
+    }
+    if ("species" %in% names(row) && "species" %in% names(candidates) &&
+        !is.na(row$species[[1]]) && nzchar(as.character(row$species[[1]]))) {
+      candidates <- candidates[matches_value(candidates$species, row$species[[1]]), , drop = FALSE]
+    }
+    genes <- unique(as.character(candidates$gene_symbol))
+    genes <- genes[!is.na(genes) & nzchar(genes)]
+    if (length(genes) == 0L) {
+      stop(
+        sprintf(
+          "ERROR: MSigDB did not provide genes for %s / %s. Check that database version, species, collection, and pathway name match the filtered GSEA result.",
+          row$collection[[1]],
+          row$pathway[[1]]
+        ),
+        call. = FALSE
+      )
+    }
+    gsea_rows$inPathway[[index]] <- paste(genes, collapse = ",")
+  }
+  cat(sprintf("  MSigDB database: restored pathway membership for %d selected pathway(s)\n", length(selected_rows)))
+  gsea_rows
 }
 
 #' Detect the DEG gene identifier column from column names
 find_deg_gene_column <- function(column_names) {
   candidates <- intersect(
-    c("Gene", "gene", "gene_name", "gene_id", "gene_symbol", "symbol", "SYMBOL", "GENE"),
+    c("GeneName", "Gene", "gene", "gene_name", "gene_id", "gene_symbol", "symbol", "SYMBOL", "GENE"),
     column_names
   )
   if (length(candidates) > 0) candidates[[1]] else column_names[[1]]
@@ -623,7 +797,7 @@ load_deg_table_as_ranked_stats <- function(path, requested_contrasts = character
 #' Normalize and validate CLI parameters once
 normalize_args <- function(args) {
   file_parameters <- c(
-    "gsea_filter_results", "deg_table", "normalized_expression", "sample_metadata"
+    "msigdb_database", "gsea_filter_results", "deg_analysis_results"
   )
   for (parameter in file_parameters) {
     args[[parameter]] <- non_empty(args[[parameter]])
@@ -698,7 +872,7 @@ normalize_args <- function(args) {
     "heatmap_sample_clustering_method"
   )
 
-  args$heatmap_gene_names_column <- non_empty(args$heatmap_gene_names_column) %||% "gene"
+  args$heatmap_gene_names_column <- non_empty(args$heatmap_gene_names_column) %||% "GeneName"
   args$heatmap_sample_names_column <- non_empty(args$heatmap_sample_names_column) %||% "Sample"
   args$heatmap_group_column <- non_empty(args$heatmap_group_column) %||% "Group"
   args$rank_area_color <- non_empty(args$rank_area_color) %||% "red/blue by Gene score"
@@ -787,33 +961,15 @@ resolve_selection <- function(gsea_filter, config) {
   )
 }
 
-#' Load heatmap inputs only when an LE panel remains requested
-resolve_heatmap_inputs <- function(config) {
+#' Load the DEG Analysis expression/metadata bundle only when an LE panel remains requested.
+resolve_heatmap_inputs <- function(config, deg_bundle) {
   plots_to_include <- config$plots_to_include
   if (!grepl("LE", plots_to_include, fixed = TRUE)) {
     return(list(plots_to_include = plots_to_include, batch_result = NULL))
   }
 
-  expression_path <- config$normalized_expression %||%
-    find_single_file("/data/normalized_expression", "normalized expression")
-  metadata_path <- config$sample_metadata %||%
-    find_single_file("/data/sample_metadata", "sample metadata")
-
-  missing_inputs <- character(0)
-  if (is.null(expression_path)) missing_inputs <- c(missing_inputs, "normalized expression")
-  if (is.null(metadata_path)) missing_inputs <- c(missing_inputs, "sample metadata")
-  if (length(missing_inputs) > 0) {
-    warning(
-      sprintf(
-        "LE heatmaps requested but %s not provided; switching to ES+RNK.",
-        paste(missing_inputs, collapse = " and ")
-      )
-    )
-    return(list(plots_to_include = "ES+RNK", batch_result = NULL))
-  }
-
   batch_result <- tryCatch(
-    construct_batch_result(expression_path, metadata_path),
+    construct_batch_result(deg_bundle$deg_table, deg_bundle$sample_metadata),
     error = function(error) {
       warning(sprintf("LE heatmap inputs could not be loaded (%s); switching to ES+RNK.", conditionMessage(error)))
       NULL
@@ -828,11 +984,26 @@ resolve_heatmap_inputs <- function(config) {
 
 #' Load all inputs in dependency order, minimizing unnecessary DEG processing
 load_inputs <- function(config) {
+  msigdb_path <- config$msigdb_database %||% find_msigdb_file("/data")
+  if (is.null(msigdb_path)) {
+    stop(
+      "ERROR: MSigDB database not found. Attach one MSigDB database data asset or provide --msigdb_database.",
+      call. = FALSE
+    )
+  }
+  if (!file.exists(msigdb_path)) {
+    stop(
+      sprintf("ERROR: MSigDB database not found at: %s", msigdb_path),
+      call. = FALSE
+    )
+  }
+  cat(sprintf("  MSigDB database: %s\n", msigdb_path))
+
   gsea_filter_path <- config$gsea_filter_results %||%
-    find_gsea_filter_file("/data/gsea_filter_results")
+    find_gsea_filter_file("/data")
   if (is.null(gsea_filter_path)) {
     stop(
-      "ERROR: GSEA Filter results not found. Upload a file or attach the GSEA Filter Results data asset.",
+      "ERROR: filtered_gsea_results.csv not found. Attach one GSEA Filter Result or provide --gsea_filter_results.",
       call. = FALSE
     )
   }
@@ -840,18 +1011,27 @@ load_inputs <- function(config) {
   cat(sprintf("  GSEA Filter rows: %d, columns: %d\n", nrow(gsea_filter), ncol(gsea_filter)))
 
   selection <- resolve_selection(gsea_filter, config)
+  selection$selected_rows <- restore_msigdb_membership(selection$selected_rows, msigdb_path)
   requested_deg_contrasts <- unique(as.character(selection$selected_rows$contrast))
 
-  deg_table_path <- config$deg_table %||% find_single_file("/data/deg_table", "DEG table")
-  if (is.null(deg_table_path)) {
-    stop(
-      "ERROR: A DEG table is required. Upload a DEG table or attach the DEG Table data asset.",
-      call. = FALSE
-    )
+  deg_bundle <- if (!is.null(config$deg_analysis_results)) {
+    if (!dir.exists(config$deg_analysis_results)) {
+      stop(
+        "ERROR: --deg_analysis_results must point to a directory containing DEG_Analysis.csv and Sample_Metadata.csv.",
+        call. = FALSE
+      )
+    }
+    find_deg_analysis_bundle(config$deg_analysis_results)
+  } else {
+    find_deg_analysis_bundle("/data")
   }
-  ranked_stats <- load_deg_table_as_ranked_stats(deg_table_path, requested_deg_contrasts)
+  cat(sprintf("  DEG Analysis bundle: %s\n", deg_bundle$directory))
+  ranked_stats <- load_deg_table_as_ranked_stats(
+    deg_bundle$deg_table,
+    requested_deg_contrasts
+  )
 
-  heatmap <- resolve_heatmap_inputs(config)
+  heatmap <- resolve_heatmap_inputs(config, deg_bundle)
   list(
     gsea_filter = gsea_filter,
     selected_rows = selection$selected_rows,

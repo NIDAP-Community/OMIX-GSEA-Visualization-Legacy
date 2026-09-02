@@ -2,20 +2,16 @@
 	"version": 1,
 	"attached_datasets": [
 		{
-			"id": "28035d52-03e6-4761-8f50-72d48af496d1",
-			"mount": "deg_table"
-		},
-		{
-			"id": "6b72a755-1e91-42d1-9136-48a37f427bde",
-			"mount": "sample_metadata"
-		},
-		{
-			"id": "810912ce-dc3e-4f15-b4a1-b269e7404c37",
-			"mount": "normalized_expression"
+			"id": "eb51e72e-bcb9-400d-bf94-fc8cad85c7f1",
+			"mount": "msigdb"
 		},
 		{
 			"id": "e5c4e095-f2e5-48ac-8148-d7fdb8673e05",
 			"mount": "gsea_filter_results"
+		},
+		{
+			"id": "28035d52-03e6-4761-8f50-72d48af496d1",
+			"mount": "deg_analysis_results"
 		}
 	]
 }
