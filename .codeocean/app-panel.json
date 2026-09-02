@@ -3,7 +3,7 @@
 	"named_parameters": true,
 	"general": {
 		"title": "OMIX GSEA Visualization Legacy",
-		"instructions": "Create ES, ranked-gene, and leading-edge heatmap plots from three workflow inputs.\n\n1. **MSigDB Database** — the pathway database used by GSEA. It restores pathway membership when a filtered result does not embed it.\n2. **Filtered GSEA Results** — one `filtered_gsea_results.csv` from OMIX GSEA Filters.\n3. **DEG Analysis Result Bundle** — one combined OMIX DEG Analysis Result containing `DEG_Analysis.csv`, `Sample_Metadata.csv`, and its run summary. The DEG table supplies ranking statistics and the batch-corrected expression values used for leading-edge heatmaps.\n\nKeep the two DEG files together in one Result/Data Asset. Diagnostic images and the run summary are ignored. The analysis searches attached workflow inputs recursively and stops if more than one matching bundle is present."
+		"instructions": "Create ES, ranked-gene, and leading-edge heatmap plots from three workflow inputs.\n\n1. **MSigDB Database** — the pathway database used by GSEA. It restores pathway membership when a filtered result does not embed it.\n2. **Filtered GSEA Results** — one `filtered_gsea_results.csv` from OMIX GSEA Filters.\n3. **DEG Analysis Result Bundle** — one combined OMIX DEG Analysis Result containing `DEG_Analysis.csv`, `Sample_Metadata.csv`, and its run summary. The DEG table supplies ranking statistics and the batch-corrected expression values used for leading-edge heatmaps.\n\nKeep the two DEG files together in one Result/Data Asset. Diagnostic images and the run summary are ignored. To override the attached bundle, optionally provide both **DEG Table File** and **Sample Metadata File** below; the two uploaded files are always used together and take precedence."
 	},
 	"datasets": [
 		{
@@ -27,7 +27,7 @@
 		{
 			"id": "input",
 			"name": "Input Data",
-			"help_text": "Three attached workflow inputs: MSigDB, filtered GSEA results, and one combined DEG Analysis result bundle."
+			"help_text": "Default workflow input: MSigDB, filtered GSEA results, and one combined DEG Analysis result bundle. Optionally override the DEG bundle with both explicit file selectors below."
 		},
 		{
 			"id": "selection",
@@ -51,6 +51,24 @@
 		}
 	],
 	"parameters": [
+		{
+			"id": "degTableOverride",
+			"category": "input",
+			"name": "DEG Table File (Optional)",
+			"param_name": "deg_table",
+			"help_text": "Optional override for the DEG Analysis Result Bundle. Select or upload the complete DEG table (CSV or RDS), including its ranking-statistic columns and appended normalized or batch-corrected sample-expression columns. You must also provide Sample Metadata File; together, these two files take precedence over the attached bundle.",
+			"type": "file",
+			"value_type": "string"
+		},
+		{
+			"id": "sampleMetadataOverride",
+			"category": "input",
+			"name": "Sample Metadata File (Optional)",
+			"param_name": "sample_metadata",
+			"help_text": "Optional override paired with DEG Table File. Select or upload metadata (CSV or RDS) with one row per DEG-expression sample; by default it uses Sample and Group columns. You must also provide DEG Table File; the two are never mixed with the attached bundle.",
+			"type": "file",
+			"value_type": "string"
+		},
 		{
 			"id": "hmGeneCol",
 			"category": "input",

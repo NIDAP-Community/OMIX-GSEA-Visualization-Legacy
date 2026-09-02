@@ -30,6 +30,10 @@ Keep `DEG_Analysis.csv` and `Sample_Metadata.csv` together. The adapter stops
 on ambiguous or mismatched bundles instead of silently using files from
 different analyses.
 
+For an ad-hoc override, users may optionally provide both a DEG table and its
+matching sample-metadata table in the app panel. The two explicit files take
+precedence over the attached bundle and cannot be supplied independently.
+
 ## Use in Code Ocean
 
 Attach the three inputs above, then choose the pathway selection and display
@@ -55,6 +59,9 @@ Rscript code/main.R \
 
 `--deg_analysis_results` must be the directory containing both portable DEG
 output tables, not just `DEG_Analysis.csv` alone.
+
+Alternatively, provide both `--deg_table` and `--sample_metadata` to override
+the bundle with an explicit matched pair.
 
 ## Outputs
 

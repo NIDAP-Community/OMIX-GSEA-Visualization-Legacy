@@ -35,10 +35,19 @@ Attach exactly these three inputs.
    The bundle may also contain `run_summary.txt` and diagnostic plots. They
    are ignored by this capsule.
 
-The old separate **DEG table**, **normalized expression**, and **sample
-metadata** inputs are intentionally no longer used. Keeping the DEG table and
-metadata together prevents a heatmap from silently mixing samples from a
-different analysis.
+### Optional explicit file override
+
+The default bundle contract is preferred for workflow provenance. For a local
+or ad-hoc run, the app panel can instead receive both **DEG Table File** and
+**Sample Metadata File**. The DEG table must include its ranking-statistic
+columns plus the appended normalized or batch-corrected sample-expression
+columns. When both files are supplied, they override the attached bundle.
+
+The two file selectors are intentionally all-or-nothing: supplying only one
+is an error. This prevents a heatmap from silently mixing a DEG table with
+metadata from a different analysis. The historical separate normalized-
+expression input remains unsupported; current OMIX DEG Analysis exports the
+appropriate expression values at the right of `DEG_Analysis.csv`.
 
 ## Input discovery
 
@@ -66,6 +75,18 @@ Rscript code/main.R \
 
 `--deg_analysis_results` must be a directory, not only the DEG table; it must
 contain both required DEG Analysis files.
+
+To override that directory with two explicit files, provide both arguments:
+
+```bash
+Rscript code/main.R \
+  --msigdb_database /path/to/MSigDB_v2023_2.rds \
+  --gsea_filter_results /path/to/filtered_gsea_results.csv \
+  --deg_table /path/to/DEG_Analysis.csv \
+  --sample_metadata /path/to/Sample_Metadata.csv \
+  --plots_to_include ES+RNK+LE \
+  --output_dir results
+```
 
 ## Important defaults
 

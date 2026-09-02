@@ -113,6 +113,10 @@ get_args <- function() {
                 help = "Path to GSEA Filter results file (CSV or RDS flat table)"),
     make_option(c("--deg_analysis_results"), type = "character", default = NULL,
                 help = "Directory containing the OMIX DEG Analysis result bundle (DEG_Analysis.csv and Sample_Metadata.csv)"),
+    make_option(c("--deg_table"), type = "character", default = NULL,
+                help = "Optional explicit DEG Analysis table (CSV or RDS). Must be supplied together with --sample_metadata and overrides the attached DEG Analysis result bundle."),
+    make_option(c("--sample_metadata"), type = "character", default = NULL,
+                help = "Optional explicit sample metadata table (CSV or RDS). Must be supplied together with --deg_table and overrides the attached DEG Analysis result bundle."),
     make_option(c("--contrast_filter"), type = "character", default = "none",
                 help = "Contrast filter mode: none / keep / remove [default: none]"),
     make_option(c("--contrasts"), type = "character", default = "",
@@ -252,6 +256,43 @@ normalize_first_identifier_column <- function(data, default_name) {
   }
 
   data
+}
+
+#' Resolve an explicit DEG table plus metadata override as one logical bundle.
+#'
+#' Both files are required together. This deliberately avoids mixing a
+#' user-uploaded DEG table with metadata discovered from another workflow
+#' Result/Data Asset.
+resolve_explicit_deg_inputs <- function(deg_table_path, sample_metadata_path) {
+  supplied <- c(
+    deg_table = !is.null(deg_table_path),
+    sample_metadata = !is.null(sample_metadata_path)
+  )
+  if (!any(supplied)) {
+    return(NULL)
+  }
+  if (!all(supplied)) {
+    missing <- names(supplied)[!supplied]
+    stop(
+      paste0(
+        "ERROR: Explicit DEG input requires both --deg_table and --sample_metadata. Missing: ",
+        paste(missing, collapse = ", "), ". Leave both blank to use the attached DEG Analysis result bundle."
+      ),
+      call. = FALSE
+    )
+  }
+
+  for (item in c(deg_table = deg_table_path, sample_metadata = sample_metadata_path)) {
+    if (!file.exists(item)) {
+      stop(sprintf("ERROR: Explicit input file not found: %s", item), call. = FALSE)
+    }
+  }
+
+  list(
+    directory = "<explicit file override>",
+    deg_table = deg_table_path,
+    sample_metadata = sample_metadata_path
+  )
 }
 
 #' Read the flat filtered GSEA result without dropping its first column
@@ -797,7 +838,8 @@ load_deg_table_as_ranked_stats <- function(path, requested_contrasts = character
 #' Normalize and validate CLI parameters once
 normalize_args <- function(args) {
   file_parameters <- c(
-    "msigdb_database", "gsea_filter_results", "deg_analysis_results"
+    "msigdb_database", "gsea_filter_results", "deg_analysis_results",
+    "deg_table", "sample_metadata"
   )
   for (parameter in file_parameters) {
     args[[parameter]] <- non_empty(args[[parameter]])
@@ -1014,7 +1056,14 @@ load_inputs <- function(config) {
   selection$selected_rows <- restore_msigdb_membership(selection$selected_rows, msigdb_path)
   requested_deg_contrasts <- unique(as.character(selection$selected_rows$contrast))
 
-  deg_bundle <- if (!is.null(config$deg_analysis_results)) {
+  explicit_deg_inputs <- resolve_explicit_deg_inputs(
+    config$deg_table,
+    config$sample_metadata
+  )
+  deg_bundle <- if (!is.null(explicit_deg_inputs)) {
+    cat("  DEG Analysis input: explicit DEG table + sample metadata override\n")
+    explicit_deg_inputs
+  } else if (!is.null(config$deg_analysis_results)) {
     if (!dir.exists(config$deg_analysis_results)) {
       stop(
         "ERROR: --deg_analysis_results must point to a directory containing DEG_Analysis.csv and Sample_Metadata.csv.",
