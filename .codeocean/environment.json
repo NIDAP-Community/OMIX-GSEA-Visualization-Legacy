@@ -1,39 +1,20 @@
 {
 	"version": 1,
-	"base_image": "codeocean/mosuite:v0.3.2",
+	"base_image": "codeocean/omix-r-pathway:r4.4.3-bioconductor3.20-v1",
 	"options": {
 		"registry_host_arg": true,
 		"git_ask_pass": true,
 		"mount_secrets": true
 	},
 	"installers": {
-		"rcran": {
+		"rbioconductor": {
 			"packages": [
 				{
-					"name": "DT",
-					"version": "0.34.0"
-				},
-				{
-					"name": "RColorBrewer",
-					"version": "1.1-3"
-				},
-				{
-					"name": "htmlwidgets",
-					"version": "1.6.4"
-				},
-				{
-					"name": "optparse",
-					"version": "1.8.2"
-				},
-				{
-					"name": "patchwork",
-					"version": "1.3.2"
-				},
-				{
-					"name": "plotly",
-					"version": "4.12.0"
+					"name": "ComplexHeatmap",
+					"version": "2.22.0"
 				}
 			],
+			"r_version": "4.4.3",
 			"use_rcache": true
 		}
 	}
