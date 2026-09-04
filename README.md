@@ -6,10 +6,24 @@ Generate publication-ready Gene Set Enrichment Analysis (GSEA) visualizations:
 - ranked-gene (RNK) panels; and
 - leading-edge (LE) expression heatmaps.
 
-This repository is the **Code Ocean adapter** for the legacy OMIX GSEA
-visualization implementation. It packages the run entry point, Code Ocean app
-panel, and reproducible input contract. The plotting implementation is kept
-intact while its inputs follow the current OMIX workflow handoff.
+## Canonical OMIX module
+
+| Item | Location |
+| --- | --- |
+| Canonical module | [OMIX GSEA Visualization Legacy](https://github.com/NIDAP-Community/OMIX/tree/main/modules/OMIX-GSEA-Visualization-Legacy) |
+| Interface contract | [schemas/interface.yml](https://github.com/NIDAP-Community/OMIX/blob/main/modules/OMIX-GSEA-Visualization-Legacy/schemas/interface.yml) |
+| Development contract | [OMIX module contract](https://github.com/NIDAP-Community/OMIX/blob/main/docs/module-contract.md) |
+| Released source reference | [OMIX_MODULE_SOURCE.md](OMIX_MODULE_SOURCE.md) |
+
+The canonical module owns scientific behavior, portable CLI operation, tests,
+and the reusable input/output contract. This repository is its Code Ocean
+deployment adapter.
+
+## What this deployment adds
+
+- The Code Ocean App Panel and capsule entry point.
+- Recursive workflow-result discovery and explicit DEG/metadata overrides.
+- The input bundle and result layout used by the OMIX DEG-to-GSEA workflow.
 
 ## Workflow inputs
 
@@ -72,6 +86,12 @@ the bundle with an explicit matched pair.
 Run logs also report input-consistency checks, including whether the filtered
 GSEA pathways and DEG ranking statistics are compatible.
 
+## Environment and reproducibility
+
+Use the pinned capsule environment defined in `environment/`. Retain the
+MSigDB release, filtered-GSEA result identity, DEG-result bundle, and selected
+plot parameters with every released figure.
+
 ## Repository layout
 
 ```text
@@ -92,3 +112,9 @@ environment/                     Capsule Docker environment
 “Legacy” identifies the established visualization implementation this adapter
 preserves; it does not change the required input validation or provenance
 checks.
+
+## For developers
+
+Read [AGENTS.md](AGENTS.md) and [OMIX_MODULE_SOURCE.md](OMIX_MODULE_SOURCE.md)
+before editing. Reusable scientific changes belong in the canonical OMIX module
+and are exported here only after validation.
