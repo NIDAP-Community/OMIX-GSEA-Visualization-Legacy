@@ -36,7 +36,12 @@ before editing.
 ## Release discipline
 
 - Keep the README and `OMIX_MODULE_SOURCE.md` current with the canonical
-  module link and source reference.
+  module link, canonical module/interface versions, and immutable source
+  reference.
 - Before release, confirm Git is clean, inputs are unambiguous, the app panel
   matches the intended interface, the environment is pinned, and workflow
   handoff works.
+- Create an adapter release tag only after platform validation. Record the
+  adapter tag, platform release identifier, and runtime tag plus digest in
+  `OMIX_MODULE_SOURCE.md`; mark unavailable values as pending rather than
+  guessing.
