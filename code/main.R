@@ -121,10 +121,18 @@ get_args <- function() {
                 help = "Contrast filter mode: none / keep / remove [default: none]"),
     make_option(c("--contrasts"), type = "character", default = "",
                 help = "Comma-separated contrast names for keep/remove mode [default: '']"),
-    make_option(c("--top_n_pathways"), type = "integer", default = 1L,
-                help = "Top pathways per contrast/collection. 0 = all pathways. [default: 1]"),
+    make_option(c("--top_n_pathways"), type = "integer", default = 20L,
+                help = "Top pathways per contrast/collection. 0 = all pathways. [default: 20]"),
     make_option(c("--top_n_by_sign"), type = "logical", default = FALSE,
                 help = "When TRUE, select top_n_pathways separately for positively (ES>0) and negatively (ES<0) enriched pathways. [default: FALSE]"),
+    make_option(c("--pathway_bubble_plots"), type = "logical", default = TRUE,
+                help = "Write shared OMIX pathway bubble plots in addition to legacy enrichment panels [default: TRUE]"),
+    make_option(c("--pathway_bubble_top_n"), type = "integer", default = 20L,
+                help = "Top pathways in each shared bubble-plot selection. 0 = all pathways. [default: 20]"),
+    make_option(c("--pathway_bubble_significance_statistic"), type = "character", default = "padj",
+                help = "padj (FDR) or pval used for shared bubble-plot selection [default: padj]"),
+    make_option(c("--collection_color_scale"), type = "character", default = "independent",
+                help = "independent or shared collection-specific bubble-plot colour scales [default: independent]"),
     make_option(c("--max_plots_in_pdf"), type = "integer", default = 0L,
                 help = "Total plots in PDF (global ceiling). 0 = no limit. [default: 0]"),
     make_option(c("--plots_to_include"), type = "character", default = "ES+RNK+LE",
@@ -929,10 +937,28 @@ normalize_args <- function(args) {
     stop("ERROR: pdf_height must be a positive number.", call. = FALSE)
   }
 
-  top_n_raw <- suppressWarnings(as.integer(args$top_n_pathways %||% 1L))
+  top_n_raw <- suppressWarnings(as.integer(args$top_n_pathways %||% 20L))
   args$plot_all_pathways <- is.na(top_n_raw) || top_n_raw <= 0L
   args$top_n_pathways <- if (args$plot_all_pathways) 1L else top_n_raw
   args$top_n_by_sign <- gsea_vis_bool(args$top_n_by_sign, FALSE)
+  args$pathway_bubble_plots <- gsea_vis_bool(args$pathway_bubble_plots, TRUE)
+  args$pathway_bubble_significance_statistic <- gsea_cli_choice(
+    non_empty(args$pathway_bubble_significance_statistic) %||% "padj",
+    c("padj", "pval"),
+    "padj",
+    "pathway_bubble_significance_statistic"
+  )
+  args$collection_color_scale <- gsea_cli_choice(
+    non_empty(args$collection_color_scale) %||% "independent",
+    c("independent", "shared"),
+    "independent",
+    "collection_color_scale"
+  )
+  bubble_top_n_raw <- suppressWarnings(as.integer(args$pathway_bubble_top_n %||% 20L))
+  if (is.na(bubble_top_n_raw) || bubble_top_n_raw < 0L) {
+    stop("ERROR: pathway_bubble_top_n must be zero or a positive integer.", call. = FALSE)
+  }
+  args$pathway_bubble_top_n <- bubble_top_n_raw
 
   max_plots_raw <- suppressWarnings(as.integer(args$max_plots_in_pdf %||% 0L))
   args$max_plots_in_pdf <- if (is.na(max_plots_raw) || max_plots_raw <= 0L) 0L else max_plots_raw
@@ -1000,6 +1026,41 @@ resolve_selection <- function(gsea_filter, config) {
     selected_rows = selected,
     selected_before_cap = selected_before_cap,
     selected_after_cap = nrow(selected)
+  )
+}
+
+#' Write standardized OMIX pathway-bubble figures alongside legacy panels
+write_pathway_bubble_outputs <- function(
+    gsea_results,
+    output_dir,
+    top_n_pathways,
+    collection_color_scale,
+    significance_statistic,
+    contrasts = NULL) {
+  if (!requireNamespace("OmixPathwayPlots", quietly = TRUE)) {
+    stop(
+      "ERROR: OmixPathwayPlots is required for shared pathway-bubble plots. ",
+      "Use the current OMIX r-pathway runtime or disable shared bubble plots."
+    )
+  }
+  plots <- OmixPathwayPlots::plot_pathway_bubble_set(
+    gsea_results,
+    input_format = "gsea",
+    p_value_column = significance_statistic,
+    top_n_pathways = top_n_pathways,
+    selection_scopes = c(
+      "combined_single_panel",
+      "across_all_collections",
+      "within_each_collection"
+    ),
+    selection_contrasts = contrasts,
+    plot_contrasts = contrasts,
+    collection_color_scale = collection_color_scale
+  )
+  OmixPathwayPlots::save_pathway_bubble_set(
+    plots,
+    output_dir = output_dir,
+    file_prefix = "GSEA-Vis-Pathway-Bubble"
   )
 }
 
@@ -1149,7 +1210,7 @@ report_configuration <- function(config, inputs) {
 #' Execute the core visualization with already selected rows
 run_visualization <- function(config, inputs) {
   cat("Generating plots...\n")
-  GSEA_Visualization_Local(
+  result <- GSEA_Visualization_Local(
     gsea_filter_result = inputs$gsea_filter,
     gsea_preranked_result = inputs$gsea_preranked,
     selected_rows = inputs$selected_rows,
@@ -1182,6 +1243,26 @@ run_visualization <- function(config, inputs) {
     pdf_height = config$pdf_height,
     output_dir = config$output_dir
   )
+
+  if (isTRUE(config$pathway_bubble_plots)) {
+    bubble_contrasts <- if (length(inputs$selection$plot_contrasts) == 0L) {
+      NULL
+    } else {
+      inputs$selection$plot_contrasts
+    }
+    bubble_outputs <- write_pathway_bubble_outputs(
+      gsea_results = inputs$gsea_filter,
+      output_dir = config$output_dir,
+      top_n_pathways = config$pathway_bubble_top_n,
+      collection_color_scale = config$collection_color_scale,
+      significance_statistic = config$pathway_bubble_significance_statistic,
+      contrasts = bubble_contrasts
+    )
+    result$files$pathway_bubble_manifest <- bubble_outputs$manifest
+    cat(sprintf("Shared pathway-bubble manifest: %s\n", bubble_outputs$manifest))
+  }
+
+  result
 }
 
 #' Report generated files and concise summary

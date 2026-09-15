@@ -307,7 +307,7 @@ gsea_vis_select_rows <- function(
   gsea_table,
   plot_contrasts = character(0),
   plot_all_pathways = FALSE,
-  top_n_pathways = 1,
+  top_n_pathways = 20,
   top_n_by_sign = FALSE
 ) {
   plot_contrasts <- gsea_vis_vector(plot_contrasts)
@@ -1920,7 +1920,7 @@ GSEA_Visualization_Local <- function(
   batch_result = NULL,
   plot_contrasts = character(0),
   plot_all_pathways = FALSE,
-  top_n_pathways = 1,
+  top_n_pathways = 20,
   top_n_by_sign = FALSE,
   max_plots_in_pdf = 50,
   stop_if_too_many_plots = TRUE,
@@ -2328,4 +2328,3 @@ GSEA_Visualization_Local <- function(
     )
   )
 }
-

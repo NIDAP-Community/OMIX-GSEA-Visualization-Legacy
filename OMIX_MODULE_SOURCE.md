@@ -4,10 +4,10 @@
 
 - **Module:** [OMIX GSEA Visualization Legacy](https://github.com/NIDAP-Community/OMIX/tree/main/modules/OMIX-GSEA-Visualization-Legacy)
 - **Canonical path:** `modules/OMIX-GSEA-Visualization-Legacy/`
-- **Canonical module version:** `1.0.0`
+- **Canonical module version:** `4.0.0`
 - **Canonical interface version:** `1`
 - **Canonical release tag:** Pending — baseline tag not yet established.
-- **Canonical source reference:** [`d7ff38dd5849de2e63698540f477e60a06933bb9`](https://github.com/NIDAP-Community/OMIX/commit/d7ff38dd5849de2e63698540f477e60a06933bb9)
+- **Canonical source reference:** [`b65eeb3c231eb9dfbdbc09326ab03c23bbe84c8f`](https://github.com/NIDAP-Community/OMIX/commit/b65eeb3c231eb9dfbdbc09326ab03c23bbe84c8f)
 - **Interface schema:** [schemas/interface.yml](https://github.com/NIDAP-Community/OMIX/blob/main/modules/OMIX-GSEA-Visualization-Legacy/schemas/interface.yml)
 - **Module contract:** [OMIX module contract](https://github.com/NIDAP-Community/OMIX/blob/main/docs/module-contract.md)
 

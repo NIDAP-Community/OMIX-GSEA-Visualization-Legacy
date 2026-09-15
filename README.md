@@ -82,6 +82,11 @@ the bundle with an explicit matched pair.
 - `GSEA-Vis-Enrichment-Plots.pdf` — selected pathway plots in a multi-page
   PDF.
 - `GSEA-Vis-RunningES.csv` — ranked-gene and running-enrichment-score values.
+- `GSEA-Vis-Pathway-Bubble-*.png` plus a manifest — standardized bubble
+  plots across all collections, within collections, and for each collection.
+  These use adjusted p-values/FDR by default and show 20 pathways by default;
+  the App Panel can switch to nominal p-values, another top-N limit, or shared
+  color limits across collections.
 
 Run logs also report input-consistency checks, including whether the filtered
 GSEA pathways and DEG ranking statistics are compatible.
