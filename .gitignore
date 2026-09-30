@@ -1,1 +1,7 @@
 /data/
+/results/
+/scratch/
+/.Rhistory
+/.RData
+__pycache__/
+*.py[cod]

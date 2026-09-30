@@ -1,0 +1,26 @@
+name: Adapter contract
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check App Panel, data ports, and source provenance
+        run: python3 tests/check_adapter_contract.py
+      - name: Verify contract failure detection
+        run: python3 -m unittest discover -s tests -p 'test_*.py'
+      - name: Install R parser
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends r-base-core
+      - name: Check R syntax
+        run: |
+          Rscript -e "parse(file='code/main.R'); parse(file='code/functions/gsea_enrichment_plot.R')"
