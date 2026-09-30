@@ -1,6 +1,6 @@
 {
 	"version": 1,
-	"base_image": "codeocean/omix-r-pathway:r4.4.3-bioconductor3.20-v1",
+	"base_image": "codeocean/omix-r-pathway:r4.4.3-bioconductor3.20-v2",
 	"options": {
 		"registry_host_arg": true,
 		"git_ask_pass": true,

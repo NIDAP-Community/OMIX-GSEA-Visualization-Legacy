@@ -1,6 +1,6 @@
-# hash:sha256:7324ace058c103f46134c25023f1e323194e17f8d5e129c4ab255da029a5eac9
+# hash:sha256:d873abd175858260ef7960f560107b263dea4c08c96e3c860ad8fbd63a1b5f36
 ARG REGISTRY_HOST
-FROM $REGISTRY_HOST/codeocean/omix-r-pathway:r4.4.3-bioconductor3.20-v1
+FROM $REGISTRY_HOST/codeocean/omix-r-pathway:r4.4.3-bioconductor3.20-v2
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG GIT_ASKPASS
