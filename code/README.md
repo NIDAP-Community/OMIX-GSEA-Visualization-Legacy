@@ -1,5 +1,15 @@
 # OMIX GSEA Visualization Legacy
 
+`main.R` is the only maintained platform entry point. It resolves Code Ocean
+inputs and sources the byte-identical canonical implementation from
+`functions/gsea_enrichment_plot.R`. The compatibility launcher
+`run_gsea_visualization.R` only forwards to `main.R`; it contains no scientific
+implementation.
+
+The historical second implementation `GSEA_Visualization_Local_v1.R` was
+unreferenced and has been removed. Retrieve it from Git history only for
+archaeology; do not restore it as an active code path.
+
 This Code Ocean adapter creates enrichment-score (ES), ranked-gene (RNK), and
 leading-edge (LE) heatmap plots for filtered GSEA pathways. It preserves the
 legacy plotting implementation while using the current OMIX workflow handoff.
@@ -51,10 +61,11 @@ appropriate expression values at the right of `DEG_Analysis.csv`.
 
 ## Input discovery
 
-Workflow Results are mounted below `/data` in generated subdirectories. The
-adapter searches recursively for one `filtered_gsea_results.csv`, one MSigDB
-database, and one directory containing both `DEG_Analysis.csv` and
-`Sample_Metadata.csv`.
+Workflow Results are mounted below fixed named data inputs. The adapter
+searches `/data/msigdb`, `/data/gsea_filter_results`, and `/data/deg-training`
+independently and recursively for one MSigDB database, one
+`filtered_gsea_results.csv`, and one directory containing both
+`DEG_Analysis.csv` and `Sample_Metadata.csv`.
 
 It stops with an explicit error if there are duplicate matches or if the DEG
 files came from different Result/Data Assets. Remove superseded attachments
@@ -62,21 +73,7 @@ before re-running rather than relying on file order.
 
 ## Run outside Code Ocean
 
-Point the three arguments at the same inputs described above:
-
-```bash
-Rscript code/main.R \
-  --msigdb_database /path/to/MSigDB_v2023_2.rds \
-  --gsea_filter_results /path/to/filtered_gsea_results.csv \
-  --deg_analysis_results /path/to/deg-analysis-result \
-  --plots_to_include ES+RNK+LE \
-  --output_dir results
-```
-
-`--deg_analysis_results` must be a directory, not only the DEG table; it must
-contain both required DEG Analysis files.
-
-To override that directory with two explicit files, provide both arguments:
+Point the four canonical input arguments at the same files described above:
 
 ```bash
 Rscript code/main.R \
@@ -87,6 +84,9 @@ Rscript code/main.R \
   --plots_to_include ES+RNK+LE \
   --output_dir results
 ```
+
+The paired DEG and metadata paths are mandatory for an explicit local run.
+Only Code Ocean's attached-input translation discovers the pair automatically.
 
 ## Important defaults
 

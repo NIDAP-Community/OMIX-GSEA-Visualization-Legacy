@@ -52,30 +52,30 @@ precedence over the attached bundle and cannot be supplied independently.
 
 Attach the three inputs above, then choose the pathway selection and display
 settings in the app panel. Workflow Results may mount in generated
-subdirectories below `/data`; the adapter discovers the required files
-recursively.
+subdirectories below each named data input. The adapter searches recursively
+within `/data/msigdb`, `/data/gsea_filter_results`, and `/data/deg-training`
+independently, so a file from one input cannot be selected for another.
 
 The input bundle may also contain the DEG run summary and diagnostic images.
 Those provenance files are preserved but ignored by the visualization step.
 
 ## Run locally
 
-The equivalent command-line interface is:
+For an explicit local run, provide the four canonical files directly:
 
 ```bash
 Rscript code/main.R \
   --msigdb_database /path/to/MSigDB_v2023_2.rds \
   --gsea_filter_results /path/to/filtered_gsea_results.csv \
-  --deg_analysis_results /path/to/deg-analysis-result \
+  --deg_table /path/to/DEG_Analysis.csv \
+  --sample_metadata /path/to/Sample_Metadata.csv \
   --plots_to_include ES+RNK+LE \
   --output_dir results
 ```
 
-`--deg_analysis_results` must be the directory containing both portable DEG
-output tables, not just `DEG_Analysis.csv` alone.
-
-Alternatively, provide both `--deg_table` and `--sample_metadata` to override
-the bundle with an explicit matched pair.
+The Code Ocean adapter resolves the paired files from its combined attached
+DEG result when the two explicit selectors are blank. Local runs should pass
+both files explicitly; one without the other is rejected.
 
 ## Outputs
 

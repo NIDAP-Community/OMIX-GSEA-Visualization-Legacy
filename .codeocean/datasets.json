@@ -2,10 +2,6 @@
 	"version": 1,
 	"attached_datasets": [
 		{
-			"id": "28035d52-03e6-4761-8f50-72d48af496d1",
-			"mount": "deg_analysis_results"
-		},
-		{
 			"id": "98e9ac98-74cb-4149-afe9-62eef6891e45",
 			"mount": "deg-training"
 		},

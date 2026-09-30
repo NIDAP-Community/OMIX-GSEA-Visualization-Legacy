@@ -11,7 +11,10 @@ suppressPackageStartupMessages({
 # In Code Ocean, main.R is under /code and the core file is under /code/functions.
 script_args <- commandArgs(trailingOnly = FALSE)
 script_file_arg <- grep("^--file=", script_args, value = TRUE)
-script_dir <- if (length(script_file_arg) > 0) {
+test_code_root <- Sys.getenv("OMIX_ADAPTER_CODE_ROOT", unset = "")
+script_dir <- if (nzchar(test_code_root)) {
+  normalizePath(test_code_root, mustWork = TRUE)
+} else if (length(script_file_arg) > 0) {
   dirname(normalizePath(sub("^--file=", "", script_file_arg[[1]]), mustWork = FALSE))
 } else {
   getwd()
@@ -111,16 +114,16 @@ get_args <- function() {
                 help = "Path to an MSigDB database (.rds or .csv). Used to restore pathway membership when it is absent from filtered GSEA results."),
     make_option(c("--gsea_filter_results"), type = "character", default = NULL,
                 help = "Path to GSEA Filter results file (CSV or RDS flat table)"),
-    make_option(c("--deg_analysis_results"), type = "character", default = NULL,
-                help = "Directory containing the OMIX DEG Analysis result bundle (DEG_Analysis.csv and Sample_Metadata.csv)"),
     make_option(c("--deg_table"), type = "character", default = NULL,
                 help = "Optional explicit DEG Analysis table (CSV or RDS). Must be supplied together with --sample_metadata and overrides the attached DEG Analysis result bundle."),
     make_option(c("--sample_metadata"), type = "character", default = NULL,
                 help = "Optional explicit sample metadata table (CSV or RDS). Must be supplied together with --deg_table and overrides the attached DEG Analysis result bundle."),
+    make_option(c("--output_dir"), type = "character", default = "/results",
+                help = "Output directory [default: /results]"),
     make_option(c("--contrast_filter"), type = "character", default = "none",
                 help = "Contrast filter mode: none / keep / remove [default: none]"),
-    make_option(c("--contrasts"), type = "character", default = "",
-                help = "Comma-separated contrast names for keep/remove mode [default: '']"),
+    make_option(c("--contrasts"), type = "character", default = NULL,
+                help = "Comma-separated contrast names for keep/remove mode"),
     make_option(c("--top_n_pathways"), type = "integer", default = 20L,
                 help = "Top pathways per contrast/collection. 0 = all pathways. [default: 20]"),
     make_option(c("--top_n_by_sign"), type = "logical", default = FALSE,
@@ -139,8 +142,8 @@ get_args <- function() {
                 help = "Plot types: ES, ES+RNK, ES+LE, ES+RNK+LE, LE [default: ES+RNK+LE]"),
     make_option(c("--running_score_line_color"), type = "character", default = "ES sign",
                 help = "Line color: 'ES sign' or 'green' [default: ES sign]"),
-    make_option(c("--add_max_deviation_line"), type = "character", default = "xy-coordinate",
-                help = "Max deviation guide line: 'x-coordinate', 'y-coordinate', 'xy-coordinate', or 'none' [default: xy-coordinate]"),
+    make_option(c("--add_max_deviation_line"), type = "character", default = "both",
+                help = "Max deviation guide line: 'coordinate', 'horizontal', 'both', or 'none' [default: both]"),
     make_option(c("--rank_area_color"), type = "character", default = "red/blue by Gene score",
                 help = "RNK area fill color: 'grey' or 'red/blue by Gene score' [default: red/blue by Gene score]"),
     make_option(c("--show_es_rank_bar"), type = "logical", default = FALSE,
@@ -182,9 +185,7 @@ get_args <- function() {
     make_option(c("--pdf_width"), type = "numeric", default = 8.5,
                 help = "PDF width in inches [default: 8.5]"),
     make_option(c("--pdf_height"), type = "numeric", default = 6.5,
-                help = "PDF height in inches [default: 6.5]"),
-    make_option(c("--output_dir"), type = "character", default = "/results",
-                help = "Output directory [default: /results]")
+                help = "PDF height in inches [default: 6.5]")
   )
   
   parser <- OptionParser(
@@ -846,8 +847,7 @@ load_deg_table_as_ranked_stats <- function(path, requested_contrasts = character
 #' Normalize and validate CLI parameters once
 normalize_args <- function(args) {
   file_parameters <- c(
-    "msigdb_database", "gsea_filter_results", "deg_analysis_results",
-    "deg_table", "sample_metadata"
+    "msigdb_database", "gsea_filter_results", "deg_table", "sample_metadata"
   )
   for (parameter in file_parameters) {
     args[[parameter]] <- non_empty(args[[parameter]])
@@ -975,7 +975,7 @@ normalize_args <- function(args) {
     stop("ERROR: running_score_line_color must be 'ES sign', 'red/blue by ES', or 'green'.", call. = FALSE)
   )
   args$add_max_deviation_line_core <- switch(
-    non_empty(args$add_max_deviation_line) %||% "xy-coordinate",
+    non_empty(args$add_max_deviation_line) %||% "both",
     "x-coordinate" = "coordinate",
     "y-coordinate" = "horizontal",
     "xy-coordinate" = "both",
@@ -1071,23 +1071,30 @@ resolve_heatmap_inputs <- function(config, deg_bundle) {
     return(list(plots_to_include = plots_to_include, batch_result = NULL))
   }
 
-  batch_result <- tryCatch(
-    construct_batch_result(deg_bundle$deg_table, deg_bundle$sample_metadata),
-    error = function(error) {
-      warning(sprintf("LE heatmap inputs could not be loaded (%s); switching to ES+RNK.", conditionMessage(error)))
-      NULL
-    }
+  # LE is an explicit user selection. Invalid paired inputs must fail rather
+  # than silently changing the requested scientific output to ES+RNK.
+  list(
+    plots_to_include = plots_to_include,
+    batch_result = construct_batch_result(
+      deg_bundle$deg_table,
+      deg_bundle$sample_metadata
+    )
   )
-  if (is.null(batch_result)) {
-    return(list(plots_to_include = "ES+RNK", batch_result = NULL))
-  }
-
-  list(plots_to_include = plots_to_include, batch_result = batch_result)
 }
 
 #' Load all inputs in dependency order, minimizing unnecessary DEG processing
-load_inputs <- function(config) {
-  msigdb_path <- config$msigdb_database %||% find_msigdb_file("/data")
+load_inputs <- function(config, data_root = "/data") {
+  # Each hidden Code Ocean input has a fixed mount. Restricting discovery to
+  # its own mount prevents unrelated workflow artifacts elsewhere under /data
+  # from becoming accidental candidates.
+  dataset_roots <- list(
+    msigdb = file.path(data_root, "msigdb"),
+    gsea_filter = file.path(data_root, "gsea_filter_results"),
+    deg_bundle = file.path(data_root, "deg-training")
+  )
+
+  msigdb_path <- config$msigdb_database %||%
+    find_msigdb_file(dataset_roots$msigdb)
   if (is.null(msigdb_path)) {
     stop(
       "ERROR: MSigDB database not found. Attach one MSigDB database data asset or provide --msigdb_database.",
@@ -1103,7 +1110,7 @@ load_inputs <- function(config) {
   cat(sprintf("  MSigDB database: %s\n", msigdb_path))
 
   gsea_filter_path <- config$gsea_filter_results %||%
-    find_gsea_filter_file("/data")
+    find_gsea_filter_file(dataset_roots$gsea_filter)
   if (is.null(gsea_filter_path)) {
     stop(
       "ERROR: filtered_gsea_results.csv not found. Attach one GSEA Filter Result or provide --gsea_filter_results.",
@@ -1124,16 +1131,8 @@ load_inputs <- function(config) {
   deg_bundle <- if (!is.null(explicit_deg_inputs)) {
     cat("  DEG Analysis input: explicit DEG table + sample metadata override\n")
     explicit_deg_inputs
-  } else if (!is.null(config$deg_analysis_results)) {
-    if (!dir.exists(config$deg_analysis_results)) {
-      stop(
-        "ERROR: --deg_analysis_results must point to a directory containing DEG_Analysis.csv and Sample_Metadata.csv.",
-        call. = FALSE
-      )
-    }
-    find_deg_analysis_bundle(config$deg_analysis_results)
   } else {
-    find_deg_analysis_bundle("/data")
+    find_deg_analysis_bundle(dataset_roots$deg_bundle)
   }
   cat(sprintf("  DEG Analysis bundle: %s\n", deg_bundle$directory))
   ranked_stats <- load_deg_table_as_ranked_stats(
@@ -1332,7 +1331,7 @@ main <- function() {
   invisible(result)
 }
 
-if (!interactive()) {
+if (!interactive() && !identical(Sys.getenv("OMIX_ADAPTER_TEST_MODE"), "1")) {
   result <- tryCatch(
     main(),
     error = function(error) {
