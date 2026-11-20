@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Permit ES and ES+RNK workflow plots to use one unambiguous
+  `DEG_Analysis.csv` without `Sample_Metadata.csv`. Leading-edge heatmaps
+  continue to require the matched DEG/metadata pair and now report that
+  requirement explicitly.
 - Align every public and advanced App Panel control with the completed
   canonical OMIX interface, including canonical names, choices, order, and
   defaults.

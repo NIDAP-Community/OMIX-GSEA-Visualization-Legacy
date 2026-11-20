@@ -33,8 +33,9 @@ Attach exactly these three inputs.
 
 3. **OMIX DEG Analysis result bundle**
 
-   One combined Result/Data Asset from OMIX DEG Analysis. It must keep these
-   two files in the same directory:
+   One combined Result/Data Asset from OMIX DEG Analysis. `DEG_Analysis.csv`
+   is required for every plot; `Sample_Metadata.csv` is additionally required
+   when selecting a leading-edge (LE) heatmap:
 
    - `DEG_Analysis.csv` — ranking statistics such as `B-A_tstat` plus the
      sample-level expression values appended by DEG Analysis. When a batch was
@@ -53,8 +54,9 @@ or ad-hoc run, the app panel can instead receive both **DEG Table File** and
 columns plus the appended normalized or batch-corrected sample-expression
 columns. When both files are supplied, they override the attached bundle.
 
-The two file selectors are intentionally all-or-nothing: supplying only one
-is an error. This prevents a heatmap from silently mixing a DEG table with
+For ES/RNK-only plots, the DEG Table selector may be used alone. For LE
+heatmaps, the two selectors are intentionally all-or-nothing: supplying only
+one is an error. This prevents a heatmap from silently mixing a DEG table with
 metadata from a different analysis. The historical separate normalized-
 expression input remains unsupported; current OMIX DEG Analysis exports the
 appropriate expression values at the right of `DEG_Analysis.csv`.

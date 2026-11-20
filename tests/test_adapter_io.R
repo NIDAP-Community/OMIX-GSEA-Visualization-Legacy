@@ -33,19 +33,52 @@ stopifnot(
   identical(bundle$sample_metadata, metadata)
 )
 
+unlink(metadata)
+rank_only_bundle <- find_deg_analysis_bundle(
+  file.path(fixture_root, "deg-training"),
+  require_sample_metadata = FALSE
+)
+stopifnot(
+  identical(rank_only_bundle$deg_table, deg),
+  is.null(rank_only_bundle$sample_metadata)
+)
+heatmap_metadata_error <- tryCatch(
+  { find_deg_analysis_bundle(file.path(fixture_root, "deg-training")); NULL },
+  error = identity
+)
+stopifnot(
+  inherits(heatmap_metadata_error, "error"),
+  grepl("Leading-edge heatmap", conditionMessage(heatmap_metadata_error), fixed = TRUE)
+)
+write.csv(
+  data.frame(Sample = c("A1", "B1"), Group = c("A", "B")),
+  metadata,
+  row.names = FALSE
+)
+
 partial_error <- tryCatch(
   { resolve_explicit_deg_inputs(deg, NULL); NULL },
   error = identity
 )
 stopifnot(
   inherits(partial_error, "error"),
-  grepl("requires both", conditionMessage(partial_error), fixed = TRUE)
+  grepl("--sample_metadata", conditionMessage(partial_error), fixed = TRUE)
 )
 
 explicit <- resolve_explicit_deg_inputs(deg, metadata)
 stopifnot(
   identical(explicit$deg_table, deg),
   identical(explicit$sample_metadata, metadata)
+)
+
+rank_only_explicit <- resolve_explicit_deg_inputs(
+  deg,
+  NULL,
+  require_sample_metadata = FALSE
+)
+stopifnot(
+  identical(rank_only_explicit$deg_table, deg),
+  is.null(rank_only_explicit$sample_metadata)
 )
 
 duplicate_dir <- file.path(fixture_root, "msigdb", "second")
