@@ -148,4 +148,33 @@ for (png_file in png_files) {
   stopifnot(identical(png_magic, as.raw(c(137, 80, 78, 71, 13, 10, 26, 10))))
 }
 
+rank_only_output_root <- file.path(fixture_root, "results-es-rnk-only")
+rank_only_command <- c(
+  file.path(root, "code", "main.R"),
+  "--msigdb_database", paths$msigdb,
+  "--gsea_filter_results", paths$gsea,
+  "--deg_table", paths$deg,
+  "--output_dir", rank_only_output_root,
+  "--plots_to_include", "ES+RNK",
+  "--top_n_pathways", "20",
+  "--pathway_bubble_plots", "FALSE"
+)
+rank_only_status <- system2("Rscript", rank_only_command, stdout = TRUE, stderr = TRUE)
+rank_only_exit_status <- attr(rank_only_status, "status")
+if (is.null(rank_only_exit_status)) rank_only_exit_status <- 0L
+if (!identical(as.integer(rank_only_exit_status), 0L)) {
+  stop(paste(c("ES/RNK-only representative run failed:", rank_only_status), collapse = "\n"), call. = FALSE)
+}
+rank_only_expected <- c("GSEA-Vis-Enrichment-Plots.pdf", "GSEA-Vis-RunningES.csv")
+rank_only_missing <- rank_only_expected[
+  !file.exists(file.path(rank_only_output_root, rank_only_expected))
+]
+if (length(rank_only_missing) > 0L) {
+  stop(
+    "ES/RNK-only representative run did not create: ",
+    paste(rank_only_missing, collapse = ", "),
+    call. = FALSE
+  )
+}
+
 message("GSEA Visualization representative run and output checks passed: ", output_root)

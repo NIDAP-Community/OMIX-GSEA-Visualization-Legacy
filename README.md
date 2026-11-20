@@ -32,21 +32,24 @@ The capsule expects three inputs:
 1. **MSigDB database** — the same MSigDB release used for upstream GSEA.
 2. **Filtered GSEA results** — `filtered_gsea_results.csv` from OMIX GSEA
    Filters.
-3. **DEG Analysis result bundle** — one OMIX DEG Analysis Result containing
-   both `DEG_Analysis.csv` and `Sample_Metadata.csv` in the same folder.
+3. **DEG Analysis result bundle** — `DEG_Analysis.csv` for ES/RNK panels, plus
+   `Sample_Metadata.csv` in the same folder when requesting leading-edge (LE)
+   heatmaps.
 
 The DEG table supplies the ranking statistics and sample-level expression. If
 batch adjustment was included in DEG Analysis, its appended expression columns
 are batch-adjusted voom-scale log-CPM values and are used directly for the LE
 heatmap. The matching metadata controls sample annotation and ordering.
 
-Keep `DEG_Analysis.csv` and `Sample_Metadata.csv` together. The adapter stops
-on ambiguous or mismatched bundles instead of silently using files from
-different analyses.
+Keep `DEG_Analysis.csv` and `Sample_Metadata.csv` together whenever using LE
+heatmaps. For `ES` or `ES+RNK` panels, the DEG table alone is sufficient. The
+adapter stops on ambiguous or mismatched bundles instead of silently using
+files from different analyses.
 
-For an ad-hoc override, users may optionally provide both a DEG table and its
-matching sample-metadata table in the app panel. The two explicit files take
-precedence over the attached bundle and cannot be supplied independently.
+For an ad-hoc override, users may provide a DEG table and, for LE heatmaps,
+its matching sample-metadata table in the app panel. The explicit files take
+precedence over the attached bundle. Metadata cannot be supplied without a
+DEG table, and an LE heatmap cannot use an unpaired DEG table.
 
 ## Use in Code Ocean
 

@@ -115,9 +115,9 @@ get_args <- function() {
     make_option(c("--gsea_filter_results"), type = "character", default = NULL,
                 help = "Path to GSEA Filter results file (CSV or RDS flat table)"),
     make_option(c("--deg_table"), type = "character", default = NULL,
-                help = "Optional explicit DEG Analysis table (CSV or RDS). Must be supplied together with --sample_metadata and overrides the attached DEG Analysis result bundle."),
+                help = "Optional explicit DEG Analysis table (CSV or RDS). It is sufficient for ES/RNK-only plots; supply matching --sample_metadata for LE heatmaps. Overrides the attached DEG Analysis result bundle."),
     make_option(c("--sample_metadata"), type = "character", default = NULL,
-                help = "Optional explicit sample metadata table (CSV or RDS). Must be supplied together with --deg_table and overrides the attached DEG Analysis result bundle."),
+                help = "Optional explicit sample metadata table (CSV or RDS). Required with --deg_table for LE heatmaps; not needed for ES/RNK-only plots. Overrides the attached DEG Analysis result bundle."),
     make_option(c("--output_dir"), type = "character", default = "/results",
                 help = "Output directory [default: /results]"),
     make_option(c("--contrast_filter"), type = "character", default = "none",
@@ -267,12 +267,15 @@ normalize_first_identifier_column <- function(data, default_name) {
   data
 }
 
-#' Resolve an explicit DEG table plus metadata override as one logical bundle.
+#' Resolve an explicit DEG table and, when needed, matching metadata.
 #'
-#' Both files are required together. This deliberately avoids mixing a
-#' user-uploaded DEG table with metadata discovered from another workflow
-#' Result/Data Asset.
-resolve_explicit_deg_inputs <- function(deg_table_path, sample_metadata_path) {
+#' Leading-edge heatmaps need both files and deliberately never mix an
+#' explicit DEG table with metadata discovered from another workflow Result.
+#' ES/RNK-only plots use the DEG ranking statistics but do not need metadata.
+resolve_explicit_deg_inputs <- function(
+    deg_table_path,
+    sample_metadata_path,
+    require_sample_metadata = TRUE) {
   supplied <- c(
     deg_table = !is.null(deg_table_path),
     sample_metadata = !is.null(sample_metadata_path)
@@ -280,18 +283,24 @@ resolve_explicit_deg_inputs <- function(deg_table_path, sample_metadata_path) {
   if (!any(supplied)) {
     return(NULL)
   }
-  if (!all(supplied)) {
+  if (!supplied[["deg_table"]] || (isTRUE(require_sample_metadata) && !supplied[["sample_metadata"]])) {
     missing <- names(supplied)[!supplied]
     stop(
       paste0(
-        "ERROR: Explicit DEG input requires both --deg_table and --sample_metadata. Missing: ",
+        "ERROR: Explicit DEG input requires --deg_table",
+        if (isTRUE(require_sample_metadata)) " and --sample_metadata" else "",
+        ". Missing: ",
         paste(missing, collapse = ", "), ". Leave both blank to use the attached DEG Analysis result bundle."
       ),
       call. = FALSE
     )
   }
 
-  for (item in c(deg_table = deg_table_path, sample_metadata = sample_metadata_path)) {
+  explicit_paths <- c(deg_table = deg_table_path)
+  if (supplied[["sample_metadata"]]) {
+    explicit_paths <- c(explicit_paths, sample_metadata = sample_metadata_path)
+  }
+  for (item in explicit_paths) {
     if (!file.exists(item)) {
       stop(sprintf("ERROR: Explicit input file not found: %s", item), call. = FALSE)
     }
@@ -300,7 +309,7 @@ resolve_explicit_deg_inputs <- function(deg_table_path, sample_metadata_path) {
   list(
     directory = "<explicit file override>",
     deg_table = deg_table_path,
-    sample_metadata = sample_metadata_path
+    sample_metadata = if (supplied[["sample_metadata"]]) sample_metadata_path else NULL
   )
 }
 
@@ -464,30 +473,56 @@ find_msigdb_file <- function(data_root = "/data") {
   )
 }
 
-#' Locate the two interoperable files in one OMIX DEG Analysis result bundle.
+#' Locate the required DEG Analysis handoff files in one result bundle.
 #'
-#' The bundle can also include diagnostics and run_summary.txt; those are
-#' intentionally ignored.  Only the two portable handoff tables are used.
-find_deg_analysis_bundle <- function(data_root = "/data") {
+#' A DEG table is sufficient for ES/RNK panels. Leading-edge heatmaps also
+#' require matching sample metadata from the same result directory. Diagnostics
+#' and run_summary.txt are intentionally ignored.
+find_deg_analysis_bundle <- function(
+    data_root = "/data",
+    require_sample_metadata = TRUE) {
   deg_tables <- find_data_files(
     data_root = data_root,
     pattern = "^DEG_Analysis\\.csv$"
   )
+
+  if (length(deg_tables) == 0L) {
+    stop(
+      paste0(
+        "ERROR: The DEG Analysis input must contain DEG_Analysis.csv. ",
+        "Attach one OMIX DEG Analysis Result or provide --deg_table."
+      ),
+      call. = FALSE
+    )
+  }
+  if (!isTRUE(require_sample_metadata)) {
+    if (length(deg_tables) > 1L) {
+      stop(
+        sprintf(
+          "ERROR: Multiple DEG_Analysis.csv files were found below %s: %s",
+          data_root,
+          paste(deg_tables, collapse = ", ")
+        ),
+        call. = FALSE
+      )
+    }
+    return(list(
+      directory = dirname(deg_tables[[1L]]),
+      deg_table = deg_tables[[1L]],
+      sample_metadata = NULL
+    ))
+  }
+
   metadata_tables <- find_data_files(
     data_root = data_root,
     pattern = "^Sample_Metadata\\.csv$"
   )
-
-  if (length(deg_tables) == 0L || length(metadata_tables) == 0L) {
-    missing <- c(
-      if (length(deg_tables) == 0L) "DEG_Analysis.csv",
-      if (length(metadata_tables) == 0L) "Sample_Metadata.csv"
-    )
+  if (length(metadata_tables) == 0L) {
     stop(
       paste0(
-        "ERROR: The DEG Analysis input bundle must contain ",
-        paste(missing, collapse = " and "),
-        ". Attach one OMIX DEG Analysis Result with both files together."
+        "ERROR: Leading-edge heatmap panels require Sample_Metadata.csv together with ",
+        "DEG_Analysis.csv. Attach one OMIX DEG Analysis Result with both files together, ",
+        "or select ES or ES+RNK plots without LE."
       ),
       call. = FALSE
     )
@@ -1124,15 +1159,25 @@ load_inputs <- function(config, data_root = "/data") {
   selection$selected_rows <- restore_msigdb_membership(selection$selected_rows, msigdb_path)
   requested_deg_contrasts <- unique(as.character(selection$selected_rows$contrast))
 
+  require_sample_metadata <- grepl("LE", config$plots_to_include, fixed = TRUE)
   explicit_deg_inputs <- resolve_explicit_deg_inputs(
     config$deg_table,
-    config$sample_metadata
+    config$sample_metadata,
+    require_sample_metadata = require_sample_metadata
   )
   deg_bundle <- if (!is.null(explicit_deg_inputs)) {
-    cat("  DEG Analysis input: explicit DEG table + sample metadata override\n")
+    cat(
+      "  DEG Analysis input: explicit DEG table",
+      if (require_sample_metadata) " + sample metadata override" else " (metadata not required for selected panels)",
+      "\n",
+      sep = ""
+    )
     explicit_deg_inputs
   } else {
-    find_deg_analysis_bundle(dataset_roots$deg_bundle)
+    find_deg_analysis_bundle(
+      dataset_roots$deg_bundle,
+      require_sample_metadata = require_sample_metadata
+    )
   }
   cat(sprintf("  DEG Analysis bundle: %s\n", deg_bundle$directory))
   ranked_stats <- load_deg_table_as_ranked_stats(

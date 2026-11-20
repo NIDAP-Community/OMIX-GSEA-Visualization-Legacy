@@ -3,7 +3,7 @@
   "named_parameters": true,
   "general": {
     "title": "OMIX GSEA Visualization Legacy",
-    "instructions": "Create ES, ranked-gene, and leading-edge heatmap plots from three workflow inputs.\n\n1. **MSigDB Database** — the pathway database used by GSEA. It restores pathway membership when a filtered result does not embed it.\n2. **Filtered GSEA Results** — one `filtered_gsea_results.csv` from OMIX GSEA Filters.\n3. **DEG Analysis Result Bundle** — one combined OMIX DEG Analysis Result containing `DEG_Analysis.csv`, `Sample_Metadata.csv`, and its run summary. The DEG table supplies ranking statistics and the batch-corrected expression values used for leading-edge heatmaps.\n\nKeep the two DEG files together in one Result/Data Asset. Diagnostic images and the run summary are ignored. To override the attached bundle, optionally provide both **DEG Table File** and **Sample Metadata File** below; the two uploaded files are always used together and take precedence."
+    "instructions": "Create ES, ranked-gene, and leading-edge heatmap plots from three workflow inputs.\n\n1. **MSigDB Database** — the pathway database used by GSEA. It restores pathway membership when a filtered result does not embed it.\n2. **Filtered GSEA Results** — one `filtered_gsea_results.csv` from OMIX GSEA Filters.\n3. **DEG Analysis Result Bundle** — `DEG_Analysis.csv` supplies ranking statistics for every panel. `Sample_Metadata.csv` is also required for leading-edge (LE) heatmaps.\n\nKeep the two DEG files together in one Result/Data Asset whenever using LE. Diagnostic images and the run summary are ignored. For ES/RNK-only plots, a DEG table alone is sufficient. To override the attached bundle, provide **DEG Table File** and, for LE, matching **Sample Metadata File** below; explicit files take precedence."
   },
   "datasets": [
     {
@@ -19,7 +19,7 @@
     {
       "id": "98e9ac98-74cb-4149-afe9-62eef6891e45",
       "name": "DEG Analysis Result Bundle",
-      "description": "One input asset containing DEG results and Sample_Metadata.csv for DEG analysis.\n\nOne OMIX DEG Analysis Result with `DEG_Analysis.csv` and `Sample_Metadata.csv` in the same folder. Replace the legacy demo table with a combined result before running."
+      "description": "One input asset containing DEG results for visualization.\n\n`DEG_Analysis.csv` is required. `Sample_Metadata.csv` in the same folder is required only when generating leading-edge (LE) heatmaps. Replace the legacy demo table with a current DEG result before running."
     }
   ],
   "categories": [
@@ -55,7 +55,7 @@
       "category": "input",
       "name": "DEG Table File (Optional)",
       "param_name": "deg_table",
-      "description": "Optional override for the DEG Analysis Result Bundle. Select or upload the complete DEG table (CSV or RDS), including its ranking-statistic columns and appended normalized or batch-corrected sample-expression columns. You must also provide Sample Metadata File; together, these two files take precedence over the attached bundle.",
+      "description": "Optional override for the DEG Analysis Result Bundle. Select or upload the complete DEG table (CSV or RDS), including ranking-statistic columns and appended normalized or batch-corrected sample-expression columns. It is sufficient for ES/RNK-only plots. For leading-edge heatmaps, also provide the matching Sample Metadata File.",
       "type": "file",
       "value_type": "string"
     },
@@ -64,7 +64,7 @@
       "category": "input",
       "name": "Sample Metadata File (Optional)",
       "param_name": "sample_metadata",
-      "description": "Optional override paired with DEG Table File. Select or upload metadata (CSV or RDS) with one row per DEG-expression sample; by default it uses Sample and Group columns. You must also provide DEG Table File; the two are never mixed with the attached bundle.",
+      "description": "Optional override required with DEG Table File for leading-edge heatmaps. Select or upload metadata (CSV or RDS) with one row per DEG-expression sample; by default it uses Sample and Group columns. For ES/RNK-only plots, leave it blank. When supplied, it is never mixed with an attached bundle.",
       "type": "file",
       "value_type": "string"
     },
